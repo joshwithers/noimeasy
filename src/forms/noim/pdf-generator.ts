@@ -147,6 +147,8 @@ export async function generateNoimPdf(
   if (val(data, 'p1_father_name_changed') === 'yes') {
     const p1FatherBirth = [val(data, 'p1_father_birth_first_name'), val(data, 'p1_father_birth_middle_names'), val(data, 'p1_father_birth_last_name')].filter(Boolean).join(' ')
     setTextField(form, 'Person1Parent1FullBirthName', p1FatherBirth)
+  } else {
+    setTextField(form, 'Person1Parent1FullBirthName', p1FatherName)
   }
   setTextField(form, 'Person1Parent1CountryofBirth', val(data, 'p1_father_birth_country'))
 
@@ -155,6 +157,8 @@ export async function generateNoimPdf(
   if (val(data, 'p1_mother_name_changed') === 'yes') {
     const p1MotherBirth = [val(data, 'p1_mother_birth_first_name'), val(data, 'p1_mother_birth_middle_names'), val(data, 'p1_mother_birth_last_name')].filter(Boolean).join(' ')
     setTextField(form, 'Person1Parent2FullBirthName', p1MotherBirth)
+  } else {
+    setTextField(form, 'Person1Parent2FullBirthName', p1MotherName)
   }
   setTextField(form, 'Person1Parent2CountryofBirth', val(data, 'p1_mother_birth_country'))
 
@@ -196,6 +200,8 @@ export async function generateNoimPdf(
   if (val(data, 'p2_father_name_changed') === 'yes') {
     const p2FatherBirth = [val(data, 'p2_father_birth_first_name'), val(data, 'p2_father_birth_middle_names'), val(data, 'p2_father_birth_last_name')].filter(Boolean).join(' ')
     setTextField(form, 'Person2Parent1FullBirthName', p2FatherBirth)
+  } else {
+    setTextField(form, 'Person2Parent1FullBirthName', p2FatherName)
   }
   setTextField(form, 'Person2Parent1CountryofBirth', val(data, 'p2_father_birth_country'))
 
@@ -204,6 +210,8 @@ export async function generateNoimPdf(
   if (val(data, 'p2_mother_name_changed') === 'yes') {
     const p2MotherBirth = [val(data, 'p2_mother_birth_first_name'), val(data, 'p2_mother_birth_middle_names'), val(data, 'p2_mother_birth_last_name')].filter(Boolean).join(' ')
     setTextField(form, 'Person2Parent2FullBirthName', p2MotherBirth)
+  } else {
+    setTextField(form, 'Person2Parent2FullBirthName', p2MotherName)
   }
   setTextField(form, 'Person2Parent2CountryofBirth', val(data, 'p2_mother_birth_country'))
 
@@ -216,6 +224,11 @@ export async function generateNoimPdf(
   } else if (related === 'no') {
     setCheckbox(form, 'AreThePartiesRelated', 'No')
   }
+
+  // ── Wedding / Ceremony Details ──────────────────────────
+
+  setTextField(form, 'CelebrantLocation', val(data, 'wedding_location'))
+  setTextField(form, 'CelebrantTimeAndDate', formatDate(val(data, 'wedding_date')))
 
   // Flatten the form so fields appear as printed text
   form.flatten()

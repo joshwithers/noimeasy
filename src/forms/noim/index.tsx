@@ -127,6 +127,8 @@ const NoimStepComponent: FC<{ step: NoimStep; index: number }> = ({ step, index 
     ) : step.id === 'review' ? (
       <div>
         {step.fields.map((field) => <NoimFieldComponent field={field} />)}
+        <button type="submit" id="submit-btn-top" style="display:none;width:100%;margin-bottom:1.5rem">Generate my NOIM PDF</button>
+        <div id="email-feedback" style="display:none;margin-bottom:1.5rem;padding:12px 16px;border-radius:3px;font-size:0.92rem"></div>
         <div id="review-section">
           <p style="color:#888">Navigate to this step to review all your details before submitting.</p>
         </div>

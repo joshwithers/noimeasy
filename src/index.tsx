@@ -180,15 +180,6 @@ app.post('/submit', async (c) => {
   const p2Last = data['p2_last_name'] || 'Party2'
   const pdfFilename = `NOIM-${p1Last}-${p2Last}.pdf`
 
-  // Send emails in background if requested (we don't await — fire and forget)
-  const celebrantEmail = data['celebrant_email']?.trim()
-  const coupleEmail = data['couple_email']?.trim()
-  if (celebrantEmail || coupleEmail) {
-    c.executionCtx.waitUntil(
-      sendEmails(c.env, data, pdfBytes, pdfFilename, celebrantEmail, coupleEmail)
-    )
-  }
-
   // Return the PDF directly — nothing is stored
   return new Response(pdfBytes, {
     headers: {
@@ -196,6 +187,40 @@ app.post('/submit', async (c) => {
       'Content-Disposition': `attachment; filename="${pdfFilename}"`,
     },
   })
+})
+
+app.post('/send-emails', async (c) => {
+  const body = await c.req.parseBody()
+  const data: Record<string, string> = {}
+  for (const [key, value] of Object.entries(body)) {
+    data[key] = String(value)
+  }
+
+  const celebrantEmail = data['celebrant_email']?.trim()
+  const coupleEmail = data['couple_email']?.trim()
+
+  if (!celebrantEmail && !coupleEmail) {
+    return c.json({ ok: false, error: 'No email addresses provided' }, 400)
+  }
+
+  // Generate the PDF again for the attachment
+  const pdfBytes = await generateNoimPdf(data)
+  const p1Last = data['p1_last_name'] || 'Party1'
+  const p2Last = data['p2_last_name'] || 'Party2'
+  const pdfFilename = `NOIM-${p1Last}-${p2Last}.pdf`
+
+  if (!c.env.RESEND_API_KEY) {
+    return c.json({ ok: false, error: 'Email sending is not configured. Please download your PDF and email it manually.' }, 500)
+  }
+
+  try {
+    await sendEmails(c.env, data, pdfBytes, pdfFilename, celebrantEmail, coupleEmail)
+    return c.json({ ok: true })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.error('Email send failed:', message)
+    return c.json({ ok: false, error: 'Failed to send emails. Please try again or email the PDF manually.' }, 500)
+  }
 })
 
 // === Email sending ===
@@ -270,7 +295,7 @@ async function sendViaResend(
 
   if (!response.ok) {
     const err = await response.text()
-    console.error(`Resend error: ${response.status} ${err}`)
+    throw new Error(`Resend error: ${response.status} ${err}`)
   }
 }
 

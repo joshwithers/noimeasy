@@ -117,6 +117,7 @@ export function getNoimClientScript(googleMapsApiKey: string): string {
   var prevBtn = document.getElementById('prev-btn');
   var nextBtn = document.getElementById('next-btn');
   var submitBtn = document.getElementById('submit-btn');
+  var submitBtnTop = document.getElementById('submit-btn-top');
   var stepIndicator = document.getElementById('step-indicator');
   var currentStep = 0;
   var COUNTRIES = ${JSON.stringify(COUNTRIES)};
@@ -128,7 +129,8 @@ export function getNoimClientScript(googleMapsApiKey: string): string {
     });
     prevBtn.style.display = index === 0 ? 'none' : '';
     nextBtn.style.display = index === steps.length - 1 ? 'none' : '';
-    submitBtn.style.display = index === steps.length - 1 ? '' : 'none';
+    submitBtn.style.display = 'none';
+    submitBtnTop.style.display = index === steps.length - 1 ? '' : 'none';
     stepIndicator.textContent = 'Step ' + (index + 1) + ' of ' + steps.length;
     currentStep = index;
     updateConditionalFields();
@@ -369,8 +371,9 @@ export function getNoimClientScript(googleMapsApiKey: string): string {
       heading.style.cssText = 'margin-bottom:0.75rem;margin-top:1.5rem';
       container.appendChild(heading);
 
-      // Birth certificate / passport
-      container.appendChild(createDocItem('Birth certificate (original or certified copy) OR valid passport'));
+      // Proof of birth + identity
+      container.appendChild(createDocItem('Proof of date and place of birth: birth certificate (original or certified copy) OR valid passport'));
+      container.appendChild(createDocItem('Photo ID to prove identity (e.g. passport, driver licence, or government-issued photo ID)'));
 
       // Conjugal status documents
       var status = getFieldValue(prefix + '_conjugal_status');
@@ -535,6 +538,107 @@ export function getNoimClientScript(googleMapsApiKey: string): string {
       if (note) note.remove();
     });
   }
+
+  // === Dynamic button text based on email fields ===
+  var celebrantEmailField = form.querySelector('[name="celebrant_email"]');
+  var coupleEmailField = form.querySelector('[name="couple_email"]');
+  var emailFeedback = document.getElementById('email-feedback');
+
+  function hasEmails() {
+    return (celebrantEmailField && celebrantEmailField.value.trim()) ||
+           (coupleEmailField && coupleEmailField.value.trim());
+  }
+
+  function updateSubmitButtonText() {
+    var text = hasEmails() ? 'Generate PDF & send emails' : 'Generate my NOIM PDF';
+    submitBtnTop.textContent = text;
+  }
+
+  if (celebrantEmailField) celebrantEmailField.addEventListener('input', updateSubmitButtonText);
+  if (coupleEmailField) coupleEmailField.addEventListener('input', updateSubmitButtonText);
+
+  // === Form submission via fetch ===
+  form.addEventListener('submit', function(e) {
+    e.preventDefault();
+    var formData = new FormData(form);
+    var btn = submitBtnTop;
+    var originalText = btn.textContent;
+    btn.disabled = true;
+    btn.setAttribute('aria-busy', 'true');
+    btn.textContent = 'Generating PDF…';
+    emailFeedback.style.display = 'none';
+
+    fetch(form.action, {
+      method: 'POST',
+      body: formData,
+    })
+    .then(function(res) {
+      if (!res.ok) throw new Error('PDF generation failed');
+      return res.blob().then(function(blob) {
+        // Trigger download
+        var url = URL.createObjectURL(blob);
+        var disposition = res.headers.get('Content-Disposition') || '';
+        var match = disposition.match(/filename="?([^"]+)"?/);
+        var filename = match ? match[1] : 'NOIM.pdf';
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      });
+    })
+    .then(function() {
+      // If emails were provided, send them
+      if (!hasEmails()) {
+        btn.disabled = false;
+        btn.removeAttribute('aria-busy');
+        btn.textContent = originalText;
+        return;
+      }
+      btn.textContent = 'Sending emails…';
+      return fetch('/send-emails', {
+        method: 'POST',
+        body: new FormData(form),
+      })
+      .then(function(res) {
+        return res.text().then(function(text) {
+          try { return JSON.parse(text); }
+          catch(e) { return { ok: false, error: 'Unexpected server response. Please try again.' }; }
+        });
+      })
+      .then(function(result) {
+        btn.disabled = false;
+        btn.removeAttribute('aria-busy');
+        btn.textContent = originalText;
+        if (result.ok) {
+          emailFeedback.style.display = 'block';
+          emailFeedback.style.background = '#e8f5e9';
+          emailFeedback.style.color = '#2e7d32';
+          emailFeedback.style.border = '1px solid #c8e6c9';
+          emailFeedback.textContent = 'Emails sent successfully.';
+        } else {
+          emailFeedback.style.display = 'block';
+          emailFeedback.style.background = '#fbe9e7';
+          emailFeedback.style.color = '#c62828';
+          emailFeedback.style.border = '1px solid #ffccbc';
+          emailFeedback.textContent = result.error || 'Failed to send emails. Please try again.';
+        }
+      });
+    })
+    .catch(function(err) {
+      btn.disabled = false;
+      btn.removeAttribute('aria-busy');
+      btn.textContent = originalText;
+      emailFeedback.style.display = 'block';
+      emailFeedback.style.background = '#fbe9e7';
+      emailFeedback.style.color = '#c62828';
+      emailFeedback.style.border = '1px solid #ffccbc';
+      emailFeedback.textContent = 'Something went wrong. Please try again.';
+      console.error('Submit error:', err);
+    });
+  });
 
   // Initialize
   showStep(0);

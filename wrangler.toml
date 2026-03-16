@@ -4,6 +4,13 @@ compatibility_date = "2025-02-01"
 # Replace with your own Cloudflare account ID (or remove to be prompted on deploy)
 # account_id = ""
 
+routes = [
+  { pattern = "noimeasy.au", custom_domain = true }
+]
+
+[vars]
+EMAIL_FROM = "hello@noimeasy.au"
+
 [[rules]]
 type = "Data"
 globs = ["**/*.pdf", "**/*.png"]
