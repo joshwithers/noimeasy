@@ -1,21 +1,15 @@
 name = "noim-prep"
 main = "src/index.tsx"
 compatibility_date = "2025-02-01"
-account_id = "60ef6bd2c48d5beb6fd6a093cff863cf"
+# Replace with your own Cloudflare account ID (or remove to be prompted on deploy)
+# account_id = ""
 
 [[rules]]
 type = "Data"
-globs = ["**/*.pdf"]
+globs = ["**/*.pdf", "**/*.png"]
 fallthrough = false
 
 [[rules]]
 type = "Text"
-globs = ["**/*.md"]
+globs = ["**/*.md", "**/*.svg", "**/*.css"]
 fallthrough = false
-
-# KV namespace for temporary PDF storage
-# Run: wrangler kv namespace create noim-pdfs
-# Then update the id below
-[[kv_namespaces]]
-binding = "KV"
-id = "307c6cacc30f4c2bacf68a0e3fa24667"

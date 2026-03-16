@@ -93,14 +93,6 @@ function partyFields(prefix: string, partyLabel: string): NoimField[] {
       titleCase: true,
       helpText: 'Leave blank if no middle name',
     },
-    // Email (optional — for receiving a copy)
-    {
-      name: `${prefix}_email`,
-      label: 'Email address',
-      type: 'email',
-      required: false,
-      helpText: 'Optional — for receiving a copy of your submission',
-    },
     // Item 4: Gender (optional)
     {
       name: `${prefix}_gender`,
@@ -395,11 +387,18 @@ export const noimSteps: NoimStep[] = [
     description: 'Please review all your details before submitting',
     fields: [
       {
-        name: 'send_copy',
-        label: 'Send me a copy of this submission',
-        type: 'checkbox',
+        name: 'celebrant_email',
+        label: 'Send a copy to your celebrant or another person',
+        type: 'email',
         required: false,
-        helpText: 'A confirmation will be sent to the email addresses provided above',
+        helpText: 'Optional — enter an email address to send the completed NOIM PDF to (e.g. your celebrant). We do not keep this address.',
+      },
+      {
+        name: 'couple_email',
+        label: 'Send a copy to yourselves',
+        type: 'email',
+        required: false,
+        helpText: 'Optional — enter your email address to receive a copy of the PDF',
       },
     ],
   },

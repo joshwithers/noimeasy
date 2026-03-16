@@ -106,12 +106,6 @@ function buildPartySection(data: Record<string, unknown>, prefix: string, partyL
   rows.push({ item: '8', label: 'Birthplace', value: formatBirthplace(data, prefix) })
   rows.push({ item: '9', label: 'Date of birth', value: formatDate(val(data, `${prefix}_dob`)) })
 
-  // Email (if provided)
-  const email = val(data, `${prefix}_email`)
-  if (email) {
-    rows.push({ item: '', label: 'Email', value: email })
-  }
-
   return { label: partyLabel, rows }
 }
 
@@ -307,7 +301,7 @@ export function renderNoimEmail(data: Record<string, unknown>): string {
     </div>
 
     <div style="padding:16px 24px;background:#f9fafb;color:#9ca3af;font-size:12px;text-align:center">
-      Submitted via NOIM Easy &bull; Joshua Withers Celebrant
+      Submitted via NOIM Easy &bull; NOIM Easy
     </div>
   </div>
 </body>
@@ -366,7 +360,7 @@ export function renderCoupleConfirmationEmail(data: Record<string, unknown>): st
     </div>
 
     <div style="padding:16px 24px;background:#f9fafb;color:#9ca3af;font-size:12px;text-align:center">
-      Joshua Withers Celebrant
+      NOIM Easy
     </div>
   </div>
 </body>

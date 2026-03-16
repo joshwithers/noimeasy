@@ -339,10 +339,10 @@ export function getNoimClientScript(googleMapsApiKey: string): string {
   function createDocItem(label) {
     var div = document.createElement('div');
     div.className = 'doc-item';
-    div.style.cssText = 'margin-bottom:0.5rem;padding:10px 16px;background:#fff;border:1px solid #d6d9dc;border-radius:4px;font-size:0.92rem;display:flex;align-items:center;gap:8px';
+    div.style.cssText = 'margin-bottom:0.5rem;padding:10px 16px;background:#fafafa;border:1px solid #e0e0e0;border-radius:3px;font-size:0.92rem;display:flex;align-items:center;gap:8px';
     var bullet = document.createElement('span');
     bullet.textContent = '\\u2022';
-    bullet.style.cssText = 'color:#1c3d5a;font-weight:bold;font-size:1.2em';
+    bullet.style.cssText = 'color:#111;font-weight:bold;font-size:1.2em';
     div.appendChild(bullet);
     var text = document.createElement('span');
     text.textContent = label;
@@ -356,7 +356,7 @@ export function getNoimClientScript(googleMapsApiKey: string): string {
     container.innerHTML = '';
 
     var intro = document.createElement('p');
-    intro.style.cssText = 'color:#6b7280;margin-bottom:1rem';
+    intro.style.cssText = 'color:#888;margin-bottom:1rem';
     intro.textContent = 'You will need to bring the following original documents when you meet with your celebrant to sign the NOIM.';
     container.appendChild(intro);
 
@@ -427,6 +427,12 @@ export function getNoimClientScript(googleMapsApiKey: string): string {
   // Uses AutocompleteSuggestion + Place.fetchFields instead of the legacy
   // Autocomplete widget or AutocompleteService. Custom dropdown, no widget conflicts.
   function initAddressFields(AutocompleteSuggestion, AutocompleteSessionToken) {
+    if (!AutocompleteSuggestion || !AutocompleteSuggestion.fetchAutocompleteSuggestions) {
+      console.error('[NOIM Easy] AutocompleteSuggestion not available. Ensure "Places API (New)" is enabled in your Google Cloud Console (this is separate from the legacy "Places API").');
+      return;
+    }
+    console.info('[NOIM Easy] Google Maps address autocomplete initialised.');
+
     document.querySelectorAll('.address-input').forEach(function(input) {
       var wrapper = input.closest('.address-select');
       if (!wrapper) return;
@@ -434,7 +440,6 @@ export function getNoimClientScript(googleMapsApiKey: string): string {
       if (!dropdown) return;
       var debounceTimer = null;
       var token = new AutocompleteSessionToken();
-      // Store predictions so we can call toPlace() on selection
       var currentPredictions = {};
 
       input.addEventListener('input', function() {
@@ -449,7 +454,7 @@ export function getNoimClientScript(googleMapsApiKey: string): string {
           AutocompleteSuggestion.fetchAutocompleteSuggestions({
             input: query,
             sessionToken: token,
-            region: 'au'
+            includedRegionCodes: ['au']
           }).then(function(response) {
             dropdown.innerHTML = '';
             currentPredictions = {};
@@ -462,28 +467,27 @@ export function getNoimClientScript(googleMapsApiKey: string): string {
               if (!pred) return;
               var opt = document.createElement('div');
               opt.className = 'address-option';
-              var main = pred.mainText ? pred.mainText.text : pred.text.text;
-              var secondary = pred.secondaryText ? pred.secondaryText.text : '';
+              var main = (pred.mainText && pred.mainText.text) ? pred.mainText.text : (pred.text ? pred.text.text : '');
+              var secondary = (pred.secondaryText && pred.secondaryText.text) ? pred.secondaryText.text : '';
+              var description = pred.text ? pred.text.text : main;
               opt.innerHTML = '<span>' + main + '</span>' + (secondary ? '<small>' + secondary + '</small>' : '');
               opt.dataset.placeId = pred.placeId;
-              opt.dataset.description = pred.text.text;
+              opt.dataset.description = description;
               currentPredictions[pred.placeId] = pred;
               dropdown.appendChild(opt);
             });
-            // Google attribution (required by ToS)
             var attr = document.createElement('div');
             attr.className = 'address-powered';
             attr.textContent = 'Powered by Google';
             dropdown.appendChild(attr);
             dropdown.style.display = 'block';
           }).catch(function(e) {
-            console.warn('Autocomplete request failed:', e);
+            console.warn('[NOIM Easy] Autocomplete request failed:', e);
             dropdown.style.display = 'none';
           });
         }, 300);
       });
 
-      // Use mousedown so it fires before blur closes the dropdown
       dropdown.addEventListener('mousedown', function(e) {
         e.preventDefault();
         var opt = e.target.closest('.address-option');
@@ -492,7 +496,6 @@ export function getNoimClientScript(googleMapsApiKey: string): string {
         input.value = opt.dataset.description;
         dropdown.style.display = 'none';
 
-        // Get the prediction and fetch full place details
         var pred = currentPredictions[opt.dataset.placeId];
         if (!pred) return;
 
@@ -518,10 +521,9 @@ export function getNoimClientScript(googleMapsApiKey: string): string {
             if (hiddenState) hiddenState.value = components.administrative_area_level_1 || '';
             if (hiddenPostcode) hiddenPostcode.value = components.postal_code || '';
           }
-          // Session ends on fetchFields — start a new one for next search
           token = new AutocompleteSessionToken();
         }).catch(function(e) {
-          console.warn('Place details fetch failed:', e);
+          console.warn('[NOIM Easy] Place details fetch failed:', e);
         });
       });
 
@@ -529,7 +531,6 @@ export function getNoimClientScript(googleMapsApiKey: string): string {
         setTimeout(function() { dropdown.style.display = 'none'; }, 200);
       });
 
-      // Remove fallback note if Google Maps loaded successfully
       var note = input.parentElement.querySelector('.address-fallback-note');
       if (note) note.remove();
     });
@@ -538,20 +539,47 @@ export function getNoimClientScript(googleMapsApiKey: string): string {
   // Initialize
   showStep(0);
 
-  // Load Google Maps Places API (New) using the inline bootstrap loader.
-  // This sets up importLibrary() immediately, then lazily loads the JS API on first use.
-  // Converted from Google's minified loader to avoid backticks/arrows (we're inside a template string).
+  // Load Google Maps Places API (New) using the Dynamic Library Import bootstrap.
+  // This sets up google.maps.importLibrary() synchronously as a stub, then lazily
+  // loads the actual JS API on first call. Required for AutocompleteSuggestion.
+  // See: https://developers.google.com/maps/documentation/javascript/load-maps-js-api
   ${hasRealApiKey ? `
-  (function(g){var h,a,k,p="The Google Maps JavaScript API",c="google",l="importLibrary",q="__ib__",m=document,b=window;b=b[c]||(b[c]={});var d=b.maps||(b.maps={}),r=new Set,e=new URLSearchParams,u=function(){return h||(h=new Promise(function(f,n){a=m.createElement("script");e.set("libraries",Array.from(r)+"");for(k in g)e.set(k.replace(/[A-Z]/g,function(t){return"_"+t[0].toLowerCase()}),g[k]);e.set("callback",c+".maps."+q);a.src="https://maps."+c+"apis.com/maps/api/js?"+e;d[q]=f;a.onerror=function(){h=n(Error(p+" could not load."))};var nEl=m.querySelector("script[nonce]");a.nonce=nEl?nEl.nonce:"";m.head.append(a)}))};d[l]?console.warn(p+" only loads once. Ignoring:",g):d[l]=function(f){r.add(f);return u().then(function(){return d[l](f)})}})({key:"${googleMapsApiKey}",v:"weekly"});
+  (function(g){
+    var h,a,k,p="The Google Maps JavaScript API",c="google",l="importLibrary",q="__ib__",m=document,b=window;
+    b=b[c]||(b[c]={});
+    var d=b.maps||(b.maps={}),r=new Set,e=new URLSearchParams;
+    var u=function(){
+      return h||(h=new Promise(function(f,n){
+        a=m.createElement("script");
+        e.set("libraries",Array.from(r)+"");
+        for(k in g) e.set(k.replace(/[A-Z]/g,function(t){return"_"+t[0].toLowerCase()}),g[k]);
+        e.set("callback",c+".maps."+q);
+        a.src="https://maps."+c+"apis.com/maps/api/js?"+e;
+        d[q]=f;
+        a.onerror=function(){h=n(Error(p+" could not load."))};
+        a.nonce=(m.querySelector("script[nonce]")||{}).nonce||"";
+        m.head.append(a);
+      }))
+    };
+    d[l]?console.warn(p+" only loads once."):d[l]=function(f){
+      r.add(f);
+      return u().then(function(){return d[l](f)})
+    };
+  })({key:"${googleMapsApiKey}",v:"weekly"});
 
+  console.info('[NOIM Easy] Google Maps bootstrap loaded, requesting Places library...');
   google.maps.importLibrary('places').then(function(lib) {
-    initAddressFields(lib.AutocompleteSuggestion, lib.AutocompleteSessionToken);
+    console.info('[NOIM Easy] Places library loaded. AutocompleteSuggestion available:', !!lib.AutocompleteSuggestion);
+    if (lib.AutocompleteSuggestion) {
+      initAddressFields(lib.AutocompleteSuggestion, lib.AutocompleteSessionToken);
+    } else {
+      console.error('[NOIM Easy] AutocompleteSuggestion not found. Enable "Places API (New)" (not legacy "Places API") at https://console.cloud.google.com/apis/library');
+    }
   }).catch(function(e) {
-    console.warn('Google Maps Places library failed to load:', e);
+    console.error('[NOIM Easy] Failed to load Places library:', e);
   });
   ` : `
-  // No Google Maps API key configured — address fields work as plain text inputs
-  console.info('Google Maps API key not configured. Address fields are plain text. Set GOOGLE_MAPS_API_KEY in .dev.vars to enable autocomplete.');
+  console.info('[NOIM Easy] No Google Maps API key configured. Address fields are plain text.');
   `}
 })();
 `

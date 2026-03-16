@@ -4,15 +4,13 @@ Under Australian law, every couple must lodge a **Notice of Intended Marriage (N
 
 This tool helps you prepare a completed NOIM form that you can print, sign, and give to your celebrant. It takes about 10 minutes.
 
----
-
 ## What is a NOIM?
 
 The Notice of Intended Marriage is a legal form required under **Section 42 of the Marriage Act 1961**. It tells the Australian Government that you intend to marry. Your celebrant must receive it at least one month before your ceremony (though in exceptional circumstances a prescribed authority can grant a shortening of time).
 
 The form collects identification details for both parties, parent information for the marriage register, and details about any previous marriages.
 
----
+
 
 ## What you'll need
 
@@ -30,7 +28,7 @@ If either party has been **previously married**, you'll also need:
 - Date the divorce became final, and which court granted it; or
 - Death certificate number and date of death (if widowed)
 
----
+
 
 ## What happens after?
 
@@ -56,7 +54,7 @@ Your NOIM must be signed in front of one of the following:
 
 The witness must sight your original identification documents when you sign.
 
----
+
 
 ## Important notes
 
@@ -65,4 +63,4 @@ The witness must sight your original identification documents when you sign.
 - Your celebrant will review everything and handle the official lodgement with the Registry of Births, Deaths and Marriages
 - All information stays between you and your celebrant — we don't store your data
 
----
+

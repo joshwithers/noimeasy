@@ -108,7 +108,7 @@ const NoimFieldComponent: FC<{ field: NoimField }> = ({ field }) => {
           </div>
         ) : null}
       </label>
-      {field.helpText && <small style="color:#6b7280">{field.helpText}</small>}
+      {field.helpText && <small style="color:#888">{field.helpText}</small>}
     </div>
   )
 }
@@ -122,13 +122,13 @@ const NoimStepComponent: FC<{ step: NoimStep; index: number }> = ({ step, index 
 
     {step.id === 'documents' ? (
       <div id="document-checklist">
-        <p style="color:#6b7280">Navigate to this step after filling in your details to see your required documents.</p>
+        <p style="color:#888">Navigate to this step after filling in your details to see your required documents.</p>
       </div>
     ) : step.id === 'review' ? (
       <div>
         {step.fields.map((field) => <NoimFieldComponent field={field} />)}
         <div id="review-section">
-          <p style="color:#6b7280">Navigate to this step to review all your details before submitting.</p>
+          <p style="color:#888">Navigate to this step to review all your details before submitting.</p>
         </div>
       </div>
     ) : (
@@ -147,139 +147,112 @@ export const NoimFormPage: FC<{
       <meta name="viewport" content="width=device-width, initial-scale=1" />
       <title>Prepare your NOIM — NOIM Easy</title>
       <meta name="description" content="NOIM Easy makes it simple to fill out and prepare your Australian Notice of Intended Marriage (NOIM). Complete the form online, download your PDF, and take it to your celebrant." />
-      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" />
+      <link rel="icon" type="image/png" href="/favicon.png" />
+      <link rel="stylesheet" href="/pico.min.css" />
       <style>{`
-        :root {
-          --gov-navy: #1c3d5a;
-          --gov-dark: #0d1f2d;
-          --gov-accent: #2a6496;
-          --gov-gold: #b08d2e;
-          --gov-border: #d6d9dc;
-          --gov-bg: #f5f6f8;
-        }
-        body { background: var(--gov-bg); color: #1a1a1a; }
+        body { background: #fff; color: #111; }
         .site-header {
-          background: var(--gov-navy);
+          background: #111;
           color: #fff;
-          padding: 1rem 0;
-          margin-bottom: 2rem;
-          border-bottom: 4px solid var(--gov-gold);
+          padding: 1.25rem 0;
+          border-bottom: 1px solid #333;
         }
         .site-header .inner {
           display: flex;
           align-items: center;
-          gap: 14px;
           max-width: 700px;
           margin: 0 auto;
           padding: 0 1rem;
         }
-        .site-header svg { flex-shrink: 0; }
-        .site-header h1 {
-          margin: 0;
-          font-size: 1.4rem;
-          font-weight: 700;
-          letter-spacing: 0.02em;
-        }
-        .site-header h1 a { color: #fff; text-decoration: none; }
-        .site-header p {
-          margin: 2px 0 0;
-          font-size: 0.85rem;
-          color: #b8c7d6;
+        .site-header img {
+          height: 32px;
+          width: auto;
         }
         .noim-field { margin-bottom: 1rem; }
-        .step-nav { display: flex; justify-content: space-between; align-items: center; margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--gov-border); }
-        .step-nav button { min-width: 120px; border-radius: 4px; }
-        #step-indicator { color: #6b7280; font-size: 14px; }
+        .step-nav { display: flex; justify-content: space-between; align-items: center; margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #e0e0e0; }
+        .step-nav button { min-width: 120px; border-radius: 3px; }
+        #step-indicator { color: #888; font-size: 14px; letter-spacing: 0.02em; }
         hgroup { margin-bottom: 1.5rem; }
-        hgroup h3 { color: var(--gov-navy); }
+        hgroup h3 { color: #111; }
         fieldset { margin: 0; }
         .address-input { width: 100%; }
         .middle-name-hint { display:none; margin-top:4px; font-size:13px; }
-        .address-fallback-note { color:#6b7280; font-size:13px; margin-top:4px; }
+        .address-fallback-note { color:#888; font-size:13px; margin-top:4px; }
 
         /* Country searchable dropdown */
         .country-select { position: relative; }
         .country-dropdown {
           display: none; position: absolute; z-index: 100; width: 100%;
           max-height: 220px; overflow-y: auto;
-          background: var(--pico-background-color, #fff);
-          border: 1px solid var(--pico-muted-border-color, #d1d5db);
-          border-top: none; border-radius: 0 0 4px 4px;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+          background: #fff;
+          border: 1px solid #d0d0d0;
+          border-top: none; border-radius: 0 0 3px 3px;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.08);
         }
         .country-option {
           padding: 10px 14px; cursor: pointer; font-size: 15px;
-          border-bottom: 1px solid var(--pico-muted-border-color, #f3f4f6);
+          border-bottom: 1px solid #f0f0f0;
         }
         .country-option:last-child { border-bottom: none; }
         .country-option:hover, .country-option:focus {
-          background: var(--pico-primary-focus, #e0e7ff);
+          background: #f5f5f5;
         }
         .country-option[style*="display: none"] + .country-option { border-top: none; }
 
-        /* Address searchable dropdown (same pattern as country) */
+        /* Address searchable dropdown */
         .address-select { position: relative; }
         .address-dropdown {
           display: none; position: absolute; z-index: 100; width: 100%;
           max-height: 260px; overflow-y: auto;
-          background: var(--pico-background-color, #fff);
-          border: 1px solid var(--pico-muted-border-color, #d1d5db);
-          border-top: none; border-radius: 0 0 4px 4px;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+          background: #fff;
+          border: 1px solid #d0d0d0;
+          border-top: none; border-radius: 0 0 3px 3px;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.08);
         }
         .address-option {
           padding: 10px 14px; cursor: pointer; font-size: 14px;
-          border-bottom: 1px solid var(--pico-muted-border-color, #f3f4f6);
+          border-bottom: 1px solid #f0f0f0;
         }
         .address-option:last-child { border-bottom: none; }
         .address-option:hover {
-          background: var(--pico-primary-focus, #e0e7ff);
+          background: #f5f5f5;
         }
-        .address-option small { display: block; color: #6b7280; font-size: 12px; margin-top: 2px; }
-        .address-powered { padding: 6px 14px; font-size: 11px; color: #9ca3af; text-align: right; }
+        .address-option small { display: block; color: #888; font-size: 12px; margin-top: 2px; }
+        .address-powered { padding: 6px 14px; font-size: 11px; color: #bbb; text-align: right; }
 
         /* Document checklist styling */
         #document-checklist .doc-item {
           padding: 10px 16px;
-          background: #fff;
-          border: 1px solid var(--gov-border);
-          border-radius: 4px;
+          background: #fafafa;
+          border: 1px solid #e0e0e0;
+          border-radius: 3px;
           margin-bottom: 0.5rem;
           font-size: 0.92rem;
         }
-        #document-checklist h4 { color: var(--gov-navy); border-bottom: 1px solid var(--gov-border); padding-bottom: 6px; }
+        #document-checklist h4 { color: #111; border-bottom: 1px solid #e0e0e0; padding-bottom: 6px; }
 
         .site-footer {
           text-align: center;
           padding: 2rem 1rem;
-          font-size: 0.8rem;
-          color: #6b7280;
-          border-top: 1px solid var(--gov-border);
+          font-size: 0.78rem;
+          color: #999;
+          border-top: 1px solid #e0e0e0;
           margin-top: 3rem;
+          letter-spacing: 0.01em;
         }
       `}</style>
     </head>
     <body>
       <div class="site-header">
         <div class="inner">
-          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-            <polyline points="14 2 14 8 20 8" />
-            <line x1="8" y1="13" x2="16" y2="13" />
-            <line x1="8" y1="17" x2="16" y2="17" />
-            <line x1="8" y1="9" x2="10" y2="9" />
-          </svg>
-          <div>
-            <h1><a href="/">NOIM Easy</a></h1>
-            <p>Prepare your Notice of Intended Marriage</p>
-          </div>
+          <a href="/"><img src="/logo.svg" alt="NOIM Easy" /></a>
         </div>
       </div>
 
       <main class="container" style="max-width:700px">
         <header style="text-align:center;margin-bottom:2rem">
-          <h2 style="color:var(--gov-navy)">Prepare your NOIM</h2>
-          <p style="color:#6b7280">
+          <h2 style="color:#111">Prepare your NOIM</h2>
+          <p style="color:#888">
             Fill in your details below. When you're done, you'll get a completed NOIM PDF to
             download, print, and sign with your celebrant and a witness.
           </p>
