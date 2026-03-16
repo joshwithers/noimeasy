@@ -66,7 +66,7 @@ app.get('/', (c) => {
             width: auto;
           }
           .landing { max-width: 700px; margin: 0 auto; padding-top: 0.5rem; }
-          .landing h1 { margin-bottom: 0.5rem; color: #111; }
+          .landing h1 { margin-top: 2rem; margin-bottom: 0.5rem; color: #111; }
           .landing h2 { color: #111; border-bottom: 1px solid #e0e0e0; padding-bottom: 0.4rem; }
           .landing h3 { color: #222; }
           .landing hr { margin: 2rem 0; border-color: #e0e0e0; }
@@ -113,6 +113,9 @@ app.get('/', (c) => {
             margin-top: 3rem;
             letter-spacing: 0.01em;
           }
+          .site-footer a { color: #999; text-decoration: underline; }
+          .site-footer a:hover { color: #666; }
+          .site-footer .credit { margin-top: 0.5rem; }
         `}</style>
       </head>
       <body>
@@ -145,6 +148,7 @@ app.get('/', (c) => {
 
         <footer class="site-footer">
           NOIM Easy is a preparation tool only. It does not constitute legal advice.
+          <div class="credit">Another <a href="https://unpopular.au">Unpopular</a> website on <a href="https://theinternet.com.au">The Internet</a></div>
         </footer>
       </body>
     </html>
