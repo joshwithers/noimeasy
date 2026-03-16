@@ -5,6 +5,7 @@ import { markdownToHtml } from './landing'
 import { generateNoimPdf } from './forms/noim/pdf-generator'
 import {
   getNoimEmailSubject,
+  renderNoimEmail,
   renderCoupleConfirmationEmail,
 } from './forms/noim/email-template'
 import landingMd from '../content/landing.md'
@@ -237,7 +238,7 @@ async function sendEmails(
 
   // Send to celebrant / third party if provided
   if (celebrantEmail) {
-    const html = renderCoupleConfirmationEmail(data)
+    const html = renderNoimEmail(data)
     await sendViaResend(env.RESEND_API_KEY, {
       from,
       to: celebrantEmail,

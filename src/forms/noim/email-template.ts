@@ -326,13 +326,13 @@ export function renderCoupleConfirmationEmail(data: Record<string, unknown>): st
 <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;margin:0;padding:20px;background:#f9fafb">
   <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #e5e7eb">
     <div style="padding:24px;background:#1f2937;color:#fff">
-      <h1 style="margin:0;font-size:18px">NOIM Received</h1>
+      <h1 style="margin:0;font-size:18px">Your NOIM is ready</h1>
       <p style="margin:8px 0 0;font-size:14px;color:#d1d5db">${escapeHtml(p1Name)} &amp; ${escapeHtml(p2Name)}</p>
     </div>
 
     <div style="padding:24px">
       <p style="font-size:15px;color:#1f2937;line-height:1.6;margin:0 0 16px">
-        Your Notice of Intended Marriage has been received by your celebrant. Here's a summary of what was submitted:
+        Your completed Notice of Intended Marriage (NOIM) PDF is attached to this email. Here's a summary:
       </p>
 
       <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:16px">
@@ -355,7 +355,7 @@ export function renderCoupleConfirmationEmail(data: Record<string, unknown>): st
       </table>
 
       <p style="font-size:14px;color:#6b7280;line-height:1.5;margin:0">
-        Your celebrant will be in touch to discuss next steps. If you have any questions, please don't hesitate to reach out.
+        Print the PDF and bring it to your meeting with your celebrant, along with your original identity documents. Your celebrant will guide you through the next steps.
       </p>
     </div>
 
