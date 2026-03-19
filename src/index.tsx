@@ -11,6 +11,7 @@ import {
 import landingMd from '../content/landing.md'
 import logoSvg from '../content/logo.svg'
 import faviconPng from '../content/favicon.png'
+import ogImagePng from '../content/og-image.png'
 import picoCss from '../content/pico.min.css'
 
 const app = new Hono<Env>()
@@ -24,6 +25,12 @@ app.get('/logo.svg', (c) => {
 
 app.get('/favicon.png', (c) => {
   return new Response(faviconPng, {
+    headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' },
+  })
+})
+
+app.get('/og-image.png', (c) => {
+  return new Response(ogImagePng, {
     headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' },
   })
 })
@@ -44,6 +51,15 @@ app.get('/', (c) => {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>NOIM Easy — Prepare your Notice of Intended Marriage</title>
         <meta name="description" content="NOIM Easy makes it simple to fill out and prepare your Australian Notice of Intended Marriage (NOIM). Complete the form online, download your PDF, and take it to your celebrant." />
+        <meta property="og:title" content="NOIM Easy — Prepare your Notice of Intended Marriage" />
+        <meta property="og:description" content="This app helps you prepare your Notice of Intended Marriage form accurately, privately, and in about 10 minutes." />
+        <meta property="og:image" content="https://noimeasy.au/og-image.png" />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://noimeasy.au/" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="NOIM Easy — Prepare your Notice of Intended Marriage" />
+        <meta name="twitter:description" content="This app helps you prepare your Notice of Intended Marriage form accurately, privately, and in about 10 minutes." />
+        <meta name="twitter:image" content="https://noimeasy.au/og-image.png" />
         <link rel="icon" type="image/png" href="/favicon.png" />
         <link rel="stylesheet" href="/pico.min.css" />
         <style>{`

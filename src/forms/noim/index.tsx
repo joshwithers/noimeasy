@@ -149,6 +149,15 @@ export const NoimFormPage: FC<{
       <meta name="viewport" content="width=device-width, initial-scale=1" />
       <title>Prepare your NOIM — NOIM Easy</title>
       <meta name="description" content="NOIM Easy makes it simple to fill out and prepare your Australian Notice of Intended Marriage (NOIM). Complete the form online, download your PDF, and take it to your celebrant." />
+      <meta property="og:title" content="Prepare your NOIM — NOIM Easy" />
+      <meta property="og:description" content="This app helps you prepare your Notice of Intended Marriage form accurately, privately, and in about 10 minutes." />
+      <meta property="og:image" content="https://noimeasy.au/og-image.png" />
+      <meta property="og:type" content="website" />
+      <meta property="og:url" content="https://noimeasy.au/prepare" />
+      <meta name="twitter:card" content="summary_large_image" />
+      <meta name="twitter:title" content="Prepare your NOIM — NOIM Easy" />
+      <meta name="twitter:description" content="This app helps you prepare your Notice of Intended Marriage form accurately, privately, and in about 10 minutes." />
+      <meta name="twitter:image" content="https://noimeasy.au/og-image.png" />
       <link rel="icon" type="image/png" href="/favicon.png" />
       <link rel="stylesheet" href="/pico.min.css" />
       <style>{`
