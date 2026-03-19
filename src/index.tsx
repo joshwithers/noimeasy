@@ -164,7 +164,7 @@ app.get('/', (c) => {
 
         <footer class="site-footer">
           NOIM Easy is a preparation tool only. It does not constitute legal advice.
-          <div class="credit">Another <a href="https://unpopular.au">Unpopular</a> website on <a href="https://theinternet.com.au">The Internet</a></div>
+          <div class="credit">Another <a href="https://unpopular.au">Unpopular</a> website on <a href="https://theinternet.com.au">The Internet</a> made by <a href="https://marriedbyjosh.com">Josh</a> for the benefit and use of the entire marriage celebrant community.</div>
         </footer>
       </body>
     </html>
