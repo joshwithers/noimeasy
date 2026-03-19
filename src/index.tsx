@@ -61,16 +61,49 @@ app.get('/', (c) => {
         <meta name="twitter:title" content="NOIM Easy — Prepare your Notice of Intended Marriage" />
         <meta name="twitter:description" content="This app helps you prepare your Notice of Intended Marriage form accurately, privately, and in about 10 minutes." />
         <meta name="twitter:image" content="https://noimeasy.au/og-image.png" />
+        <meta name="color-scheme" content="light dark" />
         <link rel="icon" type="image/png" href="/favicon.png" />
         <link rel="preload" href="/pico.min.css" as="style" />
         <link rel="stylesheet" href="/pico.min.css" />
         <style>{`
-          body { background: #fff; color: #111; }
+          :root {
+            --bg: #fff;
+            --text: #111;
+            --text-secondary: #222;
+            --text-muted: #595959;
+            --border: #e0e0e0;
+            --surface: #fafafa;
+            --header-bg: #111;
+            --header-text: #fff;
+            --header-border: #333;
+            --cta-bg: #111;
+            --cta-text: #fff;
+            --cta-hover: #333;
+            --accent-border: #111;
+          }
+          @media (prefers-color-scheme: dark) {
+            :root {
+              --bg: #1a1a1a;
+              --text: #e4e4e4;
+              --text-secondary: #d4d4d4;
+              --text-muted: #a0a0a0;
+              --border: #3a3a3a;
+              --surface: #242424;
+              --header-bg: #111;
+              --header-text: #e4e4e4;
+              --header-border: #3a3a3a;
+              --cta-bg: #e4e4e4;
+              --cta-text: #111;
+              --cta-hover: #d0d0d0;
+              --accent-border: #e4e4e4;
+            }
+          }
+          body { background: var(--bg); color: var(--text); }
           .site-header {
-            background: #111;
-            color: #fff;
+            background: var(--header-bg);
+            color: var(--header-text);
             padding: 1.25rem 0;
-            border-bottom: 1px solid #333;
+            border-bottom: 1px solid var(--header-border);
           }
           .site-header .container {
             display: flex;
@@ -84,10 +117,10 @@ app.get('/', (c) => {
             width: auto;
           }
           .landing { max-width: 700px; margin: 0 auto; padding-top: 0.5rem; }
-          .landing h1 { margin-top: 2rem; margin-bottom: 0.5rem; color: #111; }
-          .landing h2 { color: #111; border-bottom: 1px solid #e0e0e0; padding-bottom: 0.4rem; }
-          .landing h3 { color: #222; }
-          .landing hr { margin: 2rem 0; border-color: #e0e0e0; }
+          .landing h1 { margin-top: 2rem; margin-bottom: 0.5rem; color: var(--text); }
+          .landing h2 { color: var(--text); border-bottom: 1px solid var(--border); padding-bottom: 0.4rem; }
+          .landing h3 { color: var(--text-secondary); }
+          .landing hr { margin: 2rem 0; border-color: var(--border); }
           .cta { text-align: center; margin: 2.5rem 0; }
           .cta a {
             display: inline-block;
@@ -96,17 +129,17 @@ app.get('/', (c) => {
             font-weight: 600;
             border-radius: 3px;
             text-decoration: none;
-            background: #111;
-            color: #fff;
+            background: var(--cta-bg);
+            color: var(--cta-text);
             border: none;
             letter-spacing: 0.02em;
             transition: background 0.15s;
           }
-          .cta a:hover { background: #333; }
+          .cta a:hover { background: var(--cta-hover); }
           .privacy-notice {
-            background: #fafafa;
-            border: 1px solid #e0e0e0;
-            border-left: 3px solid #111;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-left: 3px solid var(--accent-border);
             border-radius: 2px;
             padding: 1.25rem 1.5rem;
             margin: 2rem 0;
@@ -116,7 +149,7 @@ app.get('/', (c) => {
           .privacy-notice h3 {
             margin-top: 0;
             font-size: 1rem;
-            color: #111;
+            color: var(--text);
             border: none;
             padding: 0;
           }
@@ -126,13 +159,13 @@ app.get('/', (c) => {
             text-align: center;
             padding: 2rem 1rem;
             font-size: 0.78rem;
-            color: #595959;
-            border-top: 1px solid #e0e0e0;
+            color: var(--text-muted);
+            border-top: 1px solid var(--border);
             margin-top: 3rem;
             letter-spacing: 0.01em;
           }
-          .site-footer a { color: #595959; text-decoration: underline; }
-          .site-footer a:hover { color: #333; }
+          .site-footer a { color: var(--text-muted); text-decoration: underline; }
+          .site-footer a:hover { color: var(--text-secondary); }
           .site-footer .credit { margin-top: 0.5rem; }
           .open-source {
             display: inline-flex;
@@ -140,14 +173,14 @@ app.get('/', (c) => {
             gap: 0.4rem;
             margin-top: 0.75rem;
             padding: 0.4rem 0.8rem;
-            border: 1px solid #e0e0e0;
+            border: 1px solid var(--border);
             border-radius: 3px;
             font-size: 0.78rem;
-            color: #595959;
+            color: var(--text-muted);
             text-decoration: none;
             transition: border-color 0.15s, color 0.15s;
           }
-          .open-source:hover { border-color: #595959; color: #333; }
+          .open-source:hover { border-color: var(--text-muted); color: var(--text-secondary); }
           .open-source svg { flex-shrink: 0; }
         `}</style>
       </head>

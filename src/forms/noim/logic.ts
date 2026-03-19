@@ -341,10 +341,10 @@ export function getNoimClientScript(googleMapsApiKey: string): string {
   function createDocItem(label) {
     var div = document.createElement('div');
     div.className = 'doc-item';
-    div.style.cssText = 'margin-bottom:0.5rem;padding:10px 16px;background:#fafafa;border:1px solid #e0e0e0;border-radius:3px;font-size:0.92rem;display:flex;align-items:center;gap:8px';
+    div.style.cssText = 'margin-bottom:0.5rem;padding:10px 16px;background:var(--surface);border:1px solid var(--border);border-radius:3px;font-size:0.92rem;display:flex;align-items:center;gap:8px';
     var bullet = document.createElement('span');
     bullet.textContent = '\\u2022';
-    bullet.style.cssText = 'color:#111;font-weight:bold;font-size:1.2em';
+    bullet.style.cssText = 'color:var(--text);font-weight:bold;font-size:1.2em';
     div.appendChild(bullet);
     var text = document.createElement('span');
     text.textContent = label;
@@ -358,7 +358,7 @@ export function getNoimClientScript(googleMapsApiKey: string): string {
     container.innerHTML = '';
 
     var intro = document.createElement('p');
-    intro.style.cssText = 'color:#888;margin-bottom:1rem';
+    intro.style.cssText = 'color:var(--text-muted);margin-bottom:1rem';
     intro.textContent = 'You will need to bring the following original documents when you meet with your celebrant to sign the NOIM.';
     container.appendChild(intro);
 
@@ -614,15 +614,15 @@ export function getNoimClientScript(googleMapsApiKey: string): string {
         btn.textContent = originalText;
         if (result.ok) {
           emailFeedback.style.display = 'block';
-          emailFeedback.style.background = '#e8f5e9';
-          emailFeedback.style.color = '#2e7d32';
-          emailFeedback.style.border = '1px solid #c8e6c9';
+          emailFeedback.style.background = 'var(--success-bg)';
+          emailFeedback.style.color = 'var(--success-text)';
+          emailFeedback.style.border = '1px solid var(--success-border)';
           emailFeedback.textContent = 'Emails sent successfully.';
         } else {
           emailFeedback.style.display = 'block';
-          emailFeedback.style.background = '#fbe9e7';
-          emailFeedback.style.color = '#c62828';
-          emailFeedback.style.border = '1px solid #ffccbc';
+          emailFeedback.style.background = 'var(--error-bg)';
+          emailFeedback.style.color = 'var(--error-text)';
+          emailFeedback.style.border = '1px solid var(--error-border)';
           emailFeedback.textContent = result.error || 'Failed to send emails. Please try again.';
         }
       });
@@ -632,9 +632,9 @@ export function getNoimClientScript(googleMapsApiKey: string): string {
       btn.removeAttribute('aria-busy');
       btn.textContent = originalText;
       emailFeedback.style.display = 'block';
-      emailFeedback.style.background = '#fbe9e7';
-      emailFeedback.style.color = '#c62828';
-      emailFeedback.style.border = '1px solid #ffccbc';
+      emailFeedback.style.background = 'var(--error-bg)';
+      emailFeedback.style.color = 'var(--error-text)';
+      emailFeedback.style.border = '1px solid var(--error-border)';
       emailFeedback.textContent = 'Something went wrong. Please try again.';
       console.error('Submit error:', err);
     });

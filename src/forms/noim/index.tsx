@@ -21,7 +21,7 @@ const NoimFieldComponent: FC<{ field: NoimField }> = ({ field }) => {
           />
           {field.label}
         </label>
-        {field.helpText && <small style="color:#6b7280;display:block;margin-top:4px">{field.helpText}</small>}
+        {field.helpText && <small style="color:var(--text-hint);display:block;margin-top:4px">{field.helpText}</small>}
       </div>
     )
   }
@@ -30,7 +30,7 @@ const NoimFieldComponent: FC<{ field: NoimField }> = ({ field }) => {
     <div {...wrapperAttrs}>
       <label>
         {field.label}
-        {field.required && <span style="color:#dc2626"> *</span>}
+        {field.required && <span style="color:var(--required)"> *</span>}
 
         {field.type === 'country' ? (
           <div class="country-select">
@@ -108,7 +108,7 @@ const NoimFieldComponent: FC<{ field: NoimField }> = ({ field }) => {
           </div>
         ) : null}
       </label>
-      {field.helpText && <small style="color:#888">{field.helpText}</small>}
+      {field.helpText && <small style="color:var(--text-hint)">{field.helpText}</small>}
     </div>
   )
 }
@@ -122,7 +122,7 @@ const NoimStepComponent: FC<{ step: NoimStep; index: number }> = ({ step, index 
 
     {step.id === 'documents' ? (
       <div id="document-checklist">
-        <p style="color:#888">Navigate to this step after filling in your details to see your required documents.</p>
+        <p style="color:var(--text-muted)">Navigate to this step after filling in your details to see your required documents.</p>
       </div>
     ) : step.id === 'review' ? (
       <div>
@@ -130,7 +130,7 @@ const NoimStepComponent: FC<{ step: NoimStep; index: number }> = ({ step, index 
         <button type="submit" id="submit-btn-top" style="display:none;width:100%;margin-bottom:1.5rem">Generate my NOIM PDF</button>
         <div id="email-feedback" style="display:none;margin-bottom:1.5rem;padding:12px 16px;border-radius:3px;font-size:0.92rem"></div>
         <div id="review-section">
-          <p style="color:#888">Navigate to this step to review all your details before submitting.</p>
+          <p style="color:var(--text-muted)">Navigate to this step to review all your details before submitting.</p>
         </div>
       </div>
     ) : (
@@ -158,15 +158,87 @@ export const NoimFormPage: FC<{
       <meta name="twitter:title" content="Prepare your NOIM — NOIM Easy" />
       <meta name="twitter:description" content="This app helps you prepare your Notice of Intended Marriage form accurately, privately, and in about 10 minutes." />
       <meta name="twitter:image" content="https://noimeasy.au/og-image.png" />
+      <meta name="color-scheme" content="light dark" />
       <link rel="icon" type="image/png" href="/favicon.png" />
       <link rel="stylesheet" href="/pico.min.css" />
       <style>{`
-        body { background: #fff; color: #111; }
+        :root {
+          --bg: #fff;
+          --text: #111;
+          --text-muted: #595959;
+          --text-hint: #6b7280;
+          --border: #e0e0e0;
+          --border-subtle: #f0f0f0;
+          --border-input: #d0d0d0;
+          --surface: #fafafa;
+          --surface-hover: #f5f5f5;
+          --header-bg: #111;
+          --header-text: #fff;
+          --header-border: #333;
+          --dropdown-shadow: rgba(0,0,0,0.08);
+          --powered-text: #888;
+          --required: #dc2626;
+          --success-bg: #e8f5e9;
+          --success-text: #2e7d32;
+          --success-border: #c8e6c9;
+          --error-bg: #fbe9e7;
+          --error-text: #c62828;
+          --error-border: #ffccbc;
+          --input-bg: #fff;
+          --input-text: #111;
+          --input-border: #d0d0d0;
+        }
+        @media (prefers-color-scheme: dark) {
+          :root {
+            --bg: #1a1a1a;
+            --text: #e4e4e4;
+            --text-muted: #a0a0a0;
+            --text-hint: #9ca3af;
+            --border: #3a3a3a;
+            --border-subtle: #2e2e2e;
+            --border-input: #4a4a4a;
+            --surface: #242424;
+            --surface-hover: #2e2e2e;
+            --header-bg: #111;
+            --header-text: #e4e4e4;
+            --header-border: #3a3a3a;
+            --dropdown-shadow: rgba(0,0,0,0.3);
+            --powered-text: #888;
+            --required: #f87171;
+            --success-bg: #14532d;
+            --success-text: #86efac;
+            --success-border: #166534;
+            --error-bg: #450a0a;
+            --error-text: #fca5a5;
+            --error-border: #7f1d1d;
+            --input-bg: #242424;
+            --input-text: #e4e4e4;
+            --input-border: #4a4a4a;
+          }
+          /* Override Pico's form element defaults for dark mode */
+          input, select, textarea {
+            background-color: var(--input-bg) !important;
+            color: var(--input-text) !important;
+            border-color: var(--input-border) !important;
+          }
+          input::placeholder, textarea::placeholder {
+            color: var(--text-muted) !important;
+          }
+          input:focus, select:focus, textarea:focus {
+            border-color: #6b9fff !important;
+            outline-color: #6b9fff;
+          }
+          select option {
+            background-color: var(--input-bg);
+            color: var(--input-text);
+          }
+        }
+        body { background: var(--bg); color: var(--text); }
         .site-header {
-          background: #111;
-          color: #fff;
+          background: var(--header-bg);
+          color: var(--header-text);
           padding: 1.25rem 0;
-          border-bottom: 1px solid #333;
+          border-bottom: 1px solid var(--header-border);
         }
         .site-header .inner {
           display: flex;
@@ -180,33 +252,34 @@ export const NoimFormPage: FC<{
           width: auto;
         }
         .noim-field { margin-bottom: 1rem; }
-        .step-nav { display: flex; justify-content: space-between; align-items: center; margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #e0e0e0; }
+        .step-nav { display: flex; justify-content: space-between; align-items: center; margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--border); }
         .step-nav button { min-width: 120px; border-radius: 3px; }
-        #step-indicator { color: #888; font-size: 14px; letter-spacing: 0.02em; }
+        #step-indicator { color: var(--text-muted); font-size: 14px; letter-spacing: 0.02em; }
         hgroup { margin-bottom: 1.5rem; }
-        hgroup h3 { color: #111; }
+        hgroup h3 { color: var(--text); }
         fieldset { margin: 0; }
         .address-input { width: 100%; }
         .middle-name-hint { display:none; margin-top:4px; font-size:13px; }
-        .address-fallback-note { color:#888; font-size:13px; margin-top:4px; }
+        .address-fallback-note { color:var(--text-muted); font-size:13px; margin-top:4px; }
 
         /* Country searchable dropdown */
         .country-select { position: relative; }
         .country-dropdown {
           display: none; position: absolute; z-index: 100; width: 100%;
           max-height: 220px; overflow-y: auto;
-          background: #fff;
-          border: 1px solid #d0d0d0;
+          background: var(--bg);
+          border: 1px solid var(--border-input);
           border-top: none; border-radius: 0 0 3px 3px;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+          box-shadow: 0 4px 12px var(--dropdown-shadow);
         }
         .country-option {
           padding: 10px 14px; cursor: pointer; font-size: 15px;
-          border-bottom: 1px solid #f0f0f0;
+          border-bottom: 1px solid var(--border-subtle);
+          color: var(--text);
         }
         .country-option:last-child { border-bottom: none; }
         .country-option:hover, .country-option:focus {
-          background: #f5f5f5;
+          background: var(--surface-hover);
         }
         .country-option[style*="display: none"] + .country-option { border-top: none; }
 
@@ -215,39 +288,40 @@ export const NoimFormPage: FC<{
         .address-dropdown {
           display: none; position: absolute; z-index: 100; width: 100%;
           max-height: 260px; overflow-y: auto;
-          background: #fff;
-          border: 1px solid #d0d0d0;
+          background: var(--bg);
+          border: 1px solid var(--border-input);
           border-top: none; border-radius: 0 0 3px 3px;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+          box-shadow: 0 4px 12px var(--dropdown-shadow);
         }
         .address-option {
           padding: 10px 14px; cursor: pointer; font-size: 14px;
-          border-bottom: 1px solid #f0f0f0;
+          border-bottom: 1px solid var(--border-subtle);
+          color: var(--text);
         }
         .address-option:last-child { border-bottom: none; }
         .address-option:hover {
-          background: #f5f5f5;
+          background: var(--surface-hover);
         }
-        .address-option small { display: block; color: #888; font-size: 12px; margin-top: 2px; }
-        .address-powered { padding: 6px 14px; font-size: 11px; color: #bbb; text-align: right; }
+        .address-option small { display: block; color: var(--text-muted); font-size: 12px; margin-top: 2px; }
+        .address-powered { padding: 6px 14px; font-size: 11px; color: var(--powered-text); text-align: right; }
 
         /* Document checklist styling */
         #document-checklist .doc-item {
           padding: 10px 16px;
-          background: #fafafa;
-          border: 1px solid #e0e0e0;
+          background: var(--surface);
+          border: 1px solid var(--border);
           border-radius: 3px;
           margin-bottom: 0.5rem;
           font-size: 0.92rem;
         }
-        #document-checklist h4 { color: #111; border-bottom: 1px solid #e0e0e0; padding-bottom: 6px; }
+        #document-checklist h4 { color: var(--text); border-bottom: 1px solid var(--border); padding-bottom: 6px; }
 
         .site-footer {
           text-align: center;
           padding: 2rem 1rem;
           font-size: 0.78rem;
-          color: #999;
-          border-top: 1px solid #e0e0e0;
+          color: var(--text-muted);
+          border-top: 1px solid var(--border);
           margin-top: 3rem;
           letter-spacing: 0.01em;
         }
@@ -262,8 +336,8 @@ export const NoimFormPage: FC<{
 
       <main class="container" style="max-width:700px">
         <header style="text-align:center;margin-bottom:2rem">
-          <h2 style="color:#111">Prepare your NOIM</h2>
-          <p style="color:#888">
+          <h2 style="color:var(--text)">Prepare your NOIM</h2>
+          <p style="color:var(--text-muted)">
             Fill in your details below. When you're done, you'll get a completed NOIM PDF to
             download, print, and sign with your celebrant and a witness.
           </p>
