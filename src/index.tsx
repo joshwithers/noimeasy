@@ -19,25 +19,25 @@ const app = new Hono<Env>()
 // === Static assets ===
 app.get('/logo.svg', (c) => {
   return new Response(logoSvg, {
-    headers: { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'public, max-age=86400' },
+    headers: { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'public, max-age=31536000, immutable' },
   })
 })
 
 app.get('/favicon.png', (c) => {
   return new Response(faviconPng, {
-    headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' },
+    headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=31536000, immutable' },
   })
 })
 
 app.get('/og-image.png', (c) => {
   return new Response(ogImagePng, {
-    headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' },
+    headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=31536000, immutable' },
   })
 })
 
 app.get('/pico.min.css', (c) => {
   return new Response(picoCss, {
-    headers: { 'Content-Type': 'text/css', 'Cache-Control': 'public, max-age=86400' },
+    headers: { 'Content-Type': 'text/css', 'Cache-Control': 'public, max-age=31536000, immutable' },
   })
 })
 
@@ -45,7 +45,8 @@ app.get('/pico.min.css', (c) => {
 app.get('/', (c) => {
   const content = markdownToHtml(landingMd)
   return c.html(
-    <html lang="en">
+    '<!DOCTYPE html>' +
+    (<html lang="en">
       <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -61,6 +62,7 @@ app.get('/', (c) => {
         <meta name="twitter:description" content="This app helps you prepare your Notice of Intended Marriage form accurately, privately, and in about 10 minutes." />
         <meta name="twitter:image" content="https://noimeasy.au/og-image.png" />
         <link rel="icon" type="image/png" href="/favicon.png" />
+        <link rel="preload" href="/pico.min.css" as="style" />
         <link rel="stylesheet" href="/pico.min.css" />
         <style>{`
           body { background: #fff; color: #111; }
@@ -124,13 +126,13 @@ app.get('/', (c) => {
             text-align: center;
             padding: 2rem 1rem;
             font-size: 0.78rem;
-            color: #999;
+            color: #595959;
             border-top: 1px solid #e0e0e0;
             margin-top: 3rem;
             letter-spacing: 0.01em;
           }
-          .site-footer a { color: #999; text-decoration: underline; }
-          .site-footer a:hover { color: #666; }
+          .site-footer a { color: #595959; text-decoration: underline; }
+          .site-footer a:hover { color: #333; }
           .site-footer .credit { margin-top: 0.5rem; }
           .open-source {
             display: inline-flex;
@@ -141,18 +143,18 @@ app.get('/', (c) => {
             border: 1px solid #e0e0e0;
             border-radius: 3px;
             font-size: 0.78rem;
-            color: #666;
+            color: #595959;
             text-decoration: none;
             transition: border-color 0.15s, color 0.15s;
           }
-          .open-source:hover { border-color: #999; color: #333; }
+          .open-source:hover { border-color: #595959; color: #333; }
           .open-source svg { flex-shrink: 0; }
         `}</style>
       </head>
       <body>
         <div class="site-header">
           <div class="container">
-            <img src="/logo.svg" alt="NOIM Easy" />
+            <img src="/logo.svg" alt="NOIM Easy" width="187" height="32" />
           </div>
         </div>
 
@@ -188,17 +190,18 @@ app.get('/', (c) => {
           </div>
         </footer>
       </body>
-    </html>
+    </html>).toString()
   )
 })
 
 // === NOIM form ===
 app.get('/prepare', (c) => {
   return c.html(
-    <NoimFormPage
+    '<!DOCTYPE html>' +
+    (<NoimFormPage
       googleMapsApiKey={c.env.GOOGLE_MAPS_API_KEY}
       submitUrl="/submit"
-    />
+    />).toString()
   )
 })
 

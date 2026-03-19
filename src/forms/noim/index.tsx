@@ -256,7 +256,7 @@ export const NoimFormPage: FC<{
     <body>
       <div class="site-header">
         <div class="inner">
-          <a href="/"><img src="/logo.svg" alt="NOIM Easy" /></a>
+          <a href="/"><img src="/logo.svg" alt="NOIM Easy" width="187" height="32" /></a>
         </div>
       </div>
 
