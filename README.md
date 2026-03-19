@@ -135,4 +135,4 @@ wrangler.toml            Cloudflare Workers configuration
 
 ## Licence
 
-This project is open source. Use it, fork it, adapt it for your own celebrant business.
+This project is open source under the [MIT License](LICENSE). Use it, fork it, adapt it for your own celebrant business. If you do run your own version, we'd love to hear about it.

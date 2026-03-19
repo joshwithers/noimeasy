@@ -132,6 +132,21 @@ app.get('/', (c) => {
           .site-footer a { color: #999; text-decoration: underline; }
           .site-footer a:hover { color: #666; }
           .site-footer .credit { margin-top: 0.5rem; }
+          .open-source {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            margin-top: 0.75rem;
+            padding: 0.4rem 0.8rem;
+            border: 1px solid #e0e0e0;
+            border-radius: 3px;
+            font-size: 0.78rem;
+            color: #666;
+            text-decoration: none;
+            transition: border-color 0.15s, color 0.15s;
+          }
+          .open-source:hover { border-color: #999; color: #333; }
+          .open-source svg { flex-shrink: 0; }
         `}</style>
       </head>
       <body>
@@ -165,6 +180,12 @@ app.get('/', (c) => {
         <footer class="site-footer">
           NOIM Easy is a preparation tool only. It does not constitute legal advice.
           <div class="credit">Another <a href="https://unpopular.au">Unpopular</a> website on <a href="https://theinternet.com.au">The Internet</a> made by <a href="https://marriedbyjosh.com">Josh</a> for the benefit and use of the entire marriage celebrant community.</div>
+          <div>
+            <a href="https://github.com/joshwithers/noimeasy" class="open-source">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+              Open source — view code, verify privacy, or run your own
+            </a>
+          </div>
         </footer>
       </body>
     </html>
