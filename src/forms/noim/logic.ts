@@ -699,14 +699,7 @@ export function getNoimClientScript(): string {
         ? Promise.resolve(cached)
         : waitForAddressRateLimit().then(function() {
             lastAddressSearchAt = Date.now();
-            var params = new URLSearchParams({
-              q: query,
-              format: 'jsonv2',
-              addressdetails: '1',
-              limit: '5',
-              'accept-language': 'en-AU,en'
-            });
-            return fetch('https://nominatim.openstreetmap.org/search?' + params.toString(), {
+            return fetch('/address-search?' + new URLSearchParams({ q: query }).toString(), {
               headers: { Accept: 'application/json' }
             }).then(function(response) {
               if (!response.ok) throw new Error('OpenStreetMap search returned ' + response.status);
