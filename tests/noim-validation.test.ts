@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { noimSteps } from '../src/forms/noim/schema.ts'
 import { ageOnDate, generateDocumentChecklist, getNoimClientScript } from '../src/forms/noim/logic.ts'
+import { addressSearchQuery, formatAustralianAddress, formatNominatimResults } from '../src/forms/noim/address.ts'
 import { safePdfFilename, validateNoimSubmission } from '../src/forms/noim/validation.ts'
 
 function validSubmission(): Record<string, string> {
@@ -56,6 +57,56 @@ function dateForAge(age: number): string {
   const date = new Date(Date.UTC(today.getUTCFullYear() - age, today.getUTCMonth(), today.getUTCDate()))
   return date.toISOString().slice(0, 10)
 }
+
+const georgeStreetResult = {
+  display_name: 'AGL Energy Limited, 200, George Street, Quay Quarter, Sydney, Sydney CBD, Sydney, New South Wales, 2000, Australia',
+  address: {
+    office: 'AGL Energy Limited',
+    house_number: '200',
+    road: 'George Street',
+    neighbourhood: 'Quay Quarter',
+    suburb: 'Sydney',
+    city: 'Sydney',
+    state: 'New South Wales',
+    'ISO3166-2-lvl4': 'AU-NSW',
+    postcode: '2000',
+    country: 'Australia',
+    country_code: 'au',
+  },
+}
+
+test('formats API addresses in Australian postal order', () => {
+  assert.equal(formatAustralianAddress(georgeStreetResult), '200 George Street, SYDNEY NSW 2000')
+  assert.equal(
+    formatAustralianAddress(georgeStreetResult, 'Unit 5, 200 George Street Sydney'),
+    'Unit 5, 200 George Street, SYDNEY NSW 2000',
+  )
+  assert.equal(
+    formatAustralianAddress(georgeStreetResult, '5/200 George Street Sydney'),
+    '5/200 George Street, SYDNEY NSW 2000',
+  )
+})
+
+test('searches without an Australian unit prefix while preserving it for display', () => {
+  assert.equal(addressSearchQuery('Unit 5, 200 George Street Sydney'), '200 George Street Sydney')
+  assert.equal(addressSearchQuery('5/200 George Street Sydney'), '200 George Street Sydney')
+  assert.equal(addressSearchQuery('200 George Street Sydney'), '200 George Street Sydney')
+})
+
+test('keeps overseas formatting and deduplicates Australian API results', () => {
+  const overseas = {
+    display_name: '10, Downing Street, Westminster, London, Greater London, England, SW1A 2AA, United Kingdom',
+    address: { country: 'United Kingdom', country_code: 'gb' },
+  }
+  assert.equal(formatAustralianAddress(overseas), overseas.display_name)
+  assert.deepEqual(
+    formatNominatimResults(
+      [georgeStreetResult, { ...georgeStreetResult, display_name: `EY Centre, ${georgeStreetResult.display_name}` }],
+      '200 George Street Sydney',
+    ).map((result) => result.formatted_name),
+    ['200 George Street, SYDNEY NSW 2000'],
+  )
+})
 
 test('accepts every official conjugal status, including divorce pending', () => {
   for (const status of ['never_married', 'divorced', 'widowed', 'divorce_pending']) {

@@ -4,6 +4,7 @@ import { NoimFormPage } from './forms/noim/index'
 import { markdownToHtml } from './landing'
 import { generateNoimPdf, UnsupportedPdfCharacterError } from './forms/noim/pdf-generator'
 import { safePdfFilename, validateNoimSubmission } from './forms/noim/validation'
+import { addressSearchQuery, formatNominatimResults } from './forms/noim/address'
 import landingMd from '../content/landing.md'
 import logoSvg from '../content/logo.svg'
 import faviconPng from '../content/favicon.png'
@@ -58,7 +59,7 @@ app.get('/address-search', async (c) => {
   }
 
   const upstreamUrl = new URL('https://nominatim.openstreetmap.org/search')
-  upstreamUrl.searchParams.set('q', query)
+  upstreamUrl.searchParams.set('q', addressSearchQuery(query))
   upstreamUrl.searchParams.set('format', 'jsonv2')
   upstreamUrl.searchParams.set('addressdetails', '1')
   upstreamUrl.searchParams.set('limit', '5')
@@ -86,7 +87,7 @@ app.get('/address-search', async (c) => {
     return c.json({ error: 'Address suggestions returned an unexpected response.' }, 502)
   }
 
-  return new Response(JSON.stringify(results), {
+  return new Response(JSON.stringify(formatNominatimResults(results, query)), {
     headers: {
       'Content-Type': 'application/json; charset=utf-8',
       'Cache-Control': 'private, no-store',

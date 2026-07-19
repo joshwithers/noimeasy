@@ -648,8 +648,12 @@ export function getNoimClientScript(): string {
     if (!dropdown || !status) return;
     var currentResults = [];
 
+    function resultLabel(result) {
+      return result.formatted_name || result.display_name || '';
+    }
+
     function chooseResult(result) {
-      input.value = result.display_name || input.value;
+      input.value = resultLabel(result) || input.value;
       dropdown.style.display = 'none';
       status.textContent = 'Address selected.';
       var parts = normaliseOsmAddress(result.address || {});
@@ -677,7 +681,7 @@ export function getNoimClientScript(): string {
         option.type = 'button';
         option.className = 'address-option';
         option.dataset.resultIndex = String(index);
-        option.textContent = result.display_name || '';
+        option.textContent = resultLabel(result);
         dropdown.appendChild(option);
       });
       dropdown.style.display = 'block';
