@@ -396,6 +396,124 @@ export function getNoimClientScript(): string {
     });
   });
 
+  // === Occupation searchable dropdown ===
+  // Load the large suggestion list only when it is first needed. The input is
+  // never restricted to the list, so a user can always type a custom value.
+  var occupationsPromise = null;
+  function loadOccupations() {
+    if (!occupationsPromise) {
+      occupationsPromise = fetch('/occupations.txt')
+        .then(function(response) {
+          if (!response.ok) throw new Error('Occupation suggestions returned ' + response.status);
+          return response.text();
+        })
+        .then(function(text) {
+          return text.split(/\\r?\\n/).map(function(value) { return value.trim(); }).filter(Boolean);
+        });
+    }
+    return occupationsPromise;
+  }
+
+  document.querySelectorAll('.occupation-select').forEach(function(wrapper) {
+    var input = wrapper.querySelector('.occupation-input');
+    var dropdown = wrapper.querySelector('.occupation-dropdown');
+    if (!input || !dropdown) return;
+    var activeIndex = -1;
+    var visibleOccupations = [];
+
+    function setExpanded(expanded) {
+      input.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+      dropdown.style.display = expanded ? 'block' : 'none';
+    }
+
+    function renderOccupations(occupations) {
+      var query = input.value.trim().toLowerCase();
+      var startsWith = [];
+      var contains = [];
+      for (var i = 0; i < occupations.length && startsWith.length + contains.length < 40; i++) {
+        var occupation = occupations[i];
+        var lower = occupation.toLowerCase();
+        if (!query || lower.startsWith(query)) startsWith.push(occupation);
+        else if (lower.includes(query)) contains.push(occupation);
+      }
+      visibleOccupations = startsWith.concat(contains).slice(0, 40);
+      activeIndex = -1;
+      dropdown.innerHTML = '';
+
+      if (!visibleOccupations.length) {
+        var empty = document.createElement('div');
+        empty.className = 'occupation-empty';
+        empty.textContent = 'No matching suggestion. Keep your own occupation as typed.';
+        dropdown.appendChild(empty);
+      } else {
+        visibleOccupations.forEach(function(occupation, index) {
+          var option = document.createElement('button');
+          option.type = 'button';
+          option.className = 'occupation-option';
+          option.setAttribute('role', 'option');
+          option.dataset.index = String(index);
+          option.textContent = occupation;
+          dropdown.appendChild(option);
+        });
+      }
+      setExpanded(true);
+    }
+
+    function refreshOccupations() {
+      dropdown.innerHTML = '<div class="occupation-empty">Loading suggestions…</div>';
+      setExpanded(true);
+      loadOccupations().then(renderOccupations).catch(function(error) {
+        console.warn('[NOIM Easy] Occupation suggestions failed:', error);
+        dropdown.innerHTML = '<div class="occupation-empty">Suggestions are unavailable. Type your occupation normally.</div>';
+      });
+    }
+
+    function selectOccupation(index) {
+      var occupation = visibleOccupations[index];
+      if (!occupation) return;
+      input.value = occupation;
+      setExpanded(false);
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    function updateActiveOption() {
+      dropdown.querySelectorAll('.occupation-option').forEach(function(option, index) {
+        option.classList.toggle('active', index === activeIndex);
+        option.setAttribute('aria-selected', index === activeIndex ? 'true' : 'false');
+      });
+    }
+
+    input.addEventListener('focus', refreshOccupations);
+    input.addEventListener('input', refreshOccupations);
+    input.addEventListener('keydown', function(event) {
+      if (event.key === 'Escape') {
+        setExpanded(false);
+        return;
+      }
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        if (!visibleOccupations.length) return;
+        event.preventDefault();
+        var direction = event.key === 'ArrowDown' ? 1 : -1;
+        activeIndex = (activeIndex + direction + visibleOccupations.length) % visibleOccupations.length;
+        updateActiveOption();
+        return;
+      }
+      if (event.key === 'Enter' && activeIndex >= 0) {
+        event.preventDefault();
+        selectOccupation(activeIndex);
+      }
+    });
+
+    dropdown.addEventListener('mousedown', function(event) {
+      event.preventDefault();
+      var option = event.target.closest('.occupation-option');
+      if (option) selectOccupation(Number(option.dataset.index));
+    });
+    input.addEventListener('blur', function() {
+      setTimeout(function() { setExpanded(false); }, 150);
+    });
+  });
+
   // === Document checklist (informational only — no uploads) ===
   function createDocItem(label) {
     var div = document.createElement('div');
@@ -606,7 +724,15 @@ export function getNoimClientScript(): string {
       });
     }
 
-    input.addEventListener('change', searchAddress);
+    input.addEventListener('input', function() {
+      dropdown.style.display = 'none';
+      currentResults = [];
+      var length = input.value.trim().length;
+      status.textContent = length >= 6
+        ? 'Finish editing to load suggestions automatically, or press Enter now.'
+        : '';
+    });
+    input.addEventListener('blur', searchAddress);
     input.addEventListener('keydown', function(event) {
       if (event.key !== 'Enter') return;
       event.preventDefault();

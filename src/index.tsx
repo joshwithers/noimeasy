@@ -9,6 +9,7 @@ import logoSvg from '../content/logo.svg'
 import faviconPng from '../content/favicon.png'
 import ogImagePng from '../content/og-image.png'
 import picoCss from '../content/pico.min.css'
+import occupationsText from './forms/noim/occupations.txt'
 
 const app = new Hono<Env>()
 
@@ -34,6 +35,16 @@ app.get('/og-image.png', (c) => {
 app.get('/pico.min.css', (c) => {
   return new Response(picoCss, {
     headers: { 'Content-Type': 'text/css', 'Cache-Control': 'public, max-age=31536000, immutable' },
+  })
+})
+
+app.get('/occupations.txt', () => {
+  return new Response(occupationsText, {
+    headers: {
+      'Content-Type': 'text/plain; charset=utf-8',
+      'Cache-Control': 'public, max-age=86400',
+      'X-Content-Type-Options': 'nosniff',
+    },
   })
 })
 

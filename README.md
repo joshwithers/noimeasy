@@ -103,8 +103,7 @@ src/
     schema.ts            Form field definitions and step structure
     logic.ts             Client-side JS (validation, conditional fields, completed-address lookup)
     index.tsx            Form page component (multi-step UI)
-    occupations.ts      Loads occupation suggestions for the form
-    occupations.txt     Occupation suggestions (custom values remain valid)
+    occupations.txt     Lazily loaded occupation suggestions (custom values remain valid)
     pdf-generator.ts     Fills in the official NOIM PDF template
     noim-blank.pdf       Blank official NOIM form (used as PDF template)
   forms/shared/

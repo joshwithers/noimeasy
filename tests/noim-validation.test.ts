@@ -212,8 +212,11 @@ test('ships a syntactically valid client script with the DOB pattern intact', ()
   assert.doesNotThrow(() => new Function(script))
   assert.equal(script.includes('var match = /^(\\d{4})-(\\d{2})-(\\d{2})$/'), true)
   assert.equal(script.includes("input.setCustomValidity('This service cannot accept a party under 16.')"), true)
-  assert.equal(script.includes("input.addEventListener('change', searchAddress);"), true)
+  assert.equal(script.includes("input.addEventListener('blur', searchAddress);"), true)
   assert.equal(script.includes('address-search-button'), false)
+  assert.equal(script.includes("fetch('/occupations.txt')"), true)
+  assert.equal(script.includes("option.className = 'occupation-option'"), true)
+  assert.equal(script.includes('Finish editing to load suggestions automatically'), true)
 })
 
 test('creates an ASCII-safe attachment filename', () => {

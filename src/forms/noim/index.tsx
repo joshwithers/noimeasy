@@ -1,7 +1,6 @@
 import type { FC } from 'hono/jsx'
 import { noimSteps, type NoimField, type NoimStep } from './schema'
 import { getNoimClientScript } from './logic'
-import { OCCUPATIONS } from './occupations'
 // Countries list is now embedded in client JS (logic.ts) for the custom dropdown
 
 const NoimFieldComponent: FC<{ field: NoimField }> = ({ field }) => {
@@ -59,6 +58,29 @@ const NoimFieldComponent: FC<{ field: NoimField }> = ({ field }) => {
               <small class="dob-age-note" role="status" aria-live="polite"></small>
             )}
           </>
+        ) : field.name.endsWith('_occupation') ? (
+          <div class="occupation-select">
+            <input
+              type="text"
+              name={field.name}
+              class="occupation-input"
+              required={field.required}
+              data-was-required={field.required ? 'true' : 'false'}
+              placeholder="Start typing an occupation"
+              maxlength={160}
+              autocomplete="off"
+              role="combobox"
+              aria-autocomplete="list"
+              aria-expanded="false"
+              aria-controls={`${field.name}-suggestions`}
+            />
+            <div
+              id={`${field.name}-suggestions`}
+              class="occupation-dropdown"
+              role="listbox"
+            ></div>
+            <small class="occupation-hint">Choose a suggestion or keep typing your own occupation.</small>
+          </div>
         ) : field.type === 'text' || field.type === 'email' ? (
           <input
             type={field.type}
@@ -67,8 +89,6 @@ const NoimFieldComponent: FC<{ field: NoimField }> = ({ field }) => {
             data-was-required={field.required ? 'true' : 'false'}
             placeholder={field.placeholder || ''}
             maxlength={field.type === 'email' ? 254 : field.type === 'text' ? 160 : undefined}
-            list={field.name.endsWith('_occupation') ? 'occupation-suggestions' : undefined}
-            autocomplete={field.name.endsWith('_occupation') ? 'off' : undefined}
           />
         ) : field.type === 'textarea' ? (
           <textarea
@@ -286,6 +306,23 @@ export const NoimFormPage: FC<{ submitUrl: string }> = ({ submitUrl }) => (
         .middle-name-hint { display:none; margin-top:4px; font-size:13px; }
         .address-fallback-note { color:var(--text-muted); font-size:13px; margin-top:4px; }
 
+        /* Occupation suggestions are loaded lazily to keep the form responsive. */
+        .occupation-select { position:relative; }
+        .occupation-input { width:100%; }
+        .occupation-hint { display:block;color:var(--text-muted);font-size:12px;margin-top:0.25rem; }
+        .occupation-dropdown {
+          display:none;position:absolute;z-index:110;width:100%;max-height:260px;overflow-y:auto;
+          background:var(--bg);border:1px solid var(--border-input);border-top:none;
+          border-radius:0 0 3px 3px;box-shadow:0 4px 12px var(--dropdown-shadow);
+        }
+        .occupation-option {
+          display:block;width:100%;margin:0;padding:9px 12px;border:0;border-radius:0;
+          border-bottom:1px solid var(--border-subtle);background:transparent;color:var(--text);
+          text-align:left;font-size:14px;cursor:pointer;
+        }
+        .occupation-option:hover, .occupation-option:focus, .occupation-option.active { background:var(--surface-hover); }
+        .occupation-empty { padding:10px 12px;color:var(--text-muted);font-size:13px; }
+
         /* Country searchable dropdown */
         .country-select { position: relative; }
         .country-dropdown {
@@ -375,9 +412,6 @@ export const NoimFormPage: FC<{ submitUrl: string }> = ({ submitUrl }) => (
         </header>
 
         <form id="noim-form" method="post" action={submitUrl}>
-          <datalist id="occupation-suggestions">
-            {OCCUPATIONS.map((occupation) => <option value={occupation}></option>)}
-          </datalist>
           {noimSteps.map((step, i) => (
             <NoimStepComponent step={step} index={i} />
           ))}
