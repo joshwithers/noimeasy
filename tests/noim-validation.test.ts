@@ -219,6 +219,8 @@ test('ships a syntactically valid client script with the DOB pattern intact', ()
   assert.equal(script.includes("fetch('/occupations.txt')"), true)
   assert.equal(script.includes("option.className = 'occupation-option'"), true)
   assert.equal(script.includes('Finish editing to load suggestions automatically'), true)
+  assert.equal(script.includes("status.textContent = 'Address selected.'"), true)
+  assert.equal(script.includes('You can edit it manually if needed'), false)
 })
 
 test('creates an ASCII-safe attachment filename', () => {

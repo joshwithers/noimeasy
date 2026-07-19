@@ -128,7 +128,6 @@ function partyFields(prefix: string, partyLabel: string): NoimField[] {
       label: 'Usual place of residence',
       type: 'address',
       required: true,
-      helpText: 'OpenStreetMap suggestions are requested once after you finish editing the address; the entered address remains editable',
     },
     // Item 7: Conjugal (marital) status
     {

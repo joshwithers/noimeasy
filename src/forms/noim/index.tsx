@@ -141,8 +141,8 @@ const NoimFieldComponent: FC<{ field: NoimField }> = ({ field }) => {
             <div class="address-search-status" role="status" aria-live="polite"></div>
             <div class="address-dropdown"></div>
             <small class="address-privacy-note">
-              After you finish editing this field, the completed address is sent once to OpenStreetMap Nominatim to find suggestions. Nothing is sent on each keystroke.{' '}
-              <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap attribution</a>
+              Enter your full address, then choose a suggestion. You can also enter it manually. Suggestions by{' '}
+              <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a>.
             </small>
             {/* Hidden fields for structured address components */}
             <input type="hidden" name={`${field.name}_street`} />

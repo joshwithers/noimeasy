@@ -651,7 +651,7 @@ export function getNoimClientScript(): string {
     function chooseResult(result) {
       input.value = result.display_name || input.value;
       dropdown.style.display = 'none';
-      status.textContent = 'Address selected. You can edit it manually if needed.';
+      status.textContent = 'Address selected.';
       var parts = normaliseOsmAddress(result.address || {});
       var baseName = input.name;
       var hiddenStreet = form.querySelector('[name="' + baseName + '_street"]');
