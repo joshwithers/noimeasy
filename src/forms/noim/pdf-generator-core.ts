@@ -1,5 +1,5 @@
 import fontkit from '@pdf-lib/fontkit'
-import { PDFDocument, PDFName, type PDFFont } from 'pdf-lib'
+import { PDFDocument, PDFName, type PDFFont, type PDFTextField } from 'pdf-lib'
 
 export class UnsupportedPdfCharacterError extends Error {
   readonly fieldName: string
@@ -10,6 +10,47 @@ export class UnsupportedPdfCharacterError extends Error {
     this.name = 'UnsupportedPdfCharacterError'
     this.fieldName = fieldName
     this.character = character
+  }
+}
+
+const PDF_FIELD_LABELS: Record<string, string> = {
+  Person1FamilyName: "Party 1's family name",
+  Person1GivenName: "Party 1's given names",
+  Person1UsualOccupation: "Party 1's occupation",
+  Person1PlaceOfResidence: "Party 1's address",
+  Person1Birthplace: "Party 1's birthplace",
+  Person1DateOfBirth: "Party 1's date of birth",
+  Person1Parent1FullCurrentName: "Party 1 Parent 1's current name",
+  Person1Parent1FullBirthName: "Party 1 Parent 1's birth name",
+  Person1Parent1CountryofBirth: "Party 1 Parent 1's country of birth",
+  Person1Parent2FullCurrentName: "Party 1 Parent 2's current name",
+  Person1Parent2FullBirthName: "Party 1 Parent 2's birth name",
+  Person1Parent2CountryofBirth: "Party 1 Parent 2's country of birth",
+  Person2FamilyName: "Party 2's family name",
+  Person2GivenName: "Party 2's given names",
+  Person2UsualOccupation: "Party 2's occupation",
+  Person2PlaceOfResidence: "Party 2's address",
+  Person2Birthplace: "Party 2's birthplace",
+  Person2DateOfBirth: "Party 2's date of birth",
+  Person2Parent1FullCurrentName: "Party 2 Parent 1's current name",
+  Person2Parent1FullBirthName: "Party 2 Parent 1's birth name",
+  Person2Parent1CountryofBirth: "Party 2 Parent 1's country of birth",
+  Person2Parent2FullCurrentName: "Party 2 Parent 2's current name",
+  Person2Parent2FullBirthName: "Party 2 Parent 2's birth name",
+  Person2Parent2CountryofBirth: "Party 2 Parent 2's country of birth",
+  RelatedPartiesRelationship: 'The relationship between the parties',
+}
+
+export class PdfFieldOverflowError extends Error {
+  readonly fieldName: string
+  readonly fieldLabel: string
+
+  constructor(fieldName: string) {
+    const fieldLabel = PDF_FIELD_LABELS[fieldName] || 'A supplied value'
+    super(`${fieldLabel} is too long to fit legibly in the official NOIM PDF`)
+    this.name = 'PdfFieldOverflowError'
+    this.fieldName = fieldName
+    this.fieldLabel = fieldLabel
   }
 }
 
@@ -56,6 +97,58 @@ function assertFontSupports(font: PDFFont, value: string, fieldName: string) {
   }
 }
 
+function wrappedLineCount(text: string, font: PDFFont, fontSize: number, width: number): number {
+  let lineCount = 0
+  const spaceWidth = font.widthOfTextAtSize(' ', fontSize)
+
+  for (const explicitLine of text.split(/\r?\n/)) {
+    const words = explicitLine.trim().split(/\s+/).filter(Boolean)
+    if (!words.length) {
+      lineCount += 1
+      continue
+    }
+
+    let lineWidth = 0
+    lineCount += 1
+    for (const word of words) {
+      const wordWidth = font.widthOfTextAtSize(word, fontSize)
+      if (wordWidth > width) return Number.POSITIVE_INFINITY
+      const proposedWidth = lineWidth ? lineWidth + spaceWidth + wordWidth : wordWidth
+      if (proposedWidth > width) {
+        lineCount += 1
+        lineWidth = wordWidth
+      } else {
+        lineWidth = proposedWidth
+      }
+    }
+  }
+
+  return lineCount
+}
+
+function textFits(field: PDFTextField, font: PDFFont, value: string, fontSize: number): boolean {
+  return field.acroField.getWidgets().every((widget) => {
+    const rectangle = widget.getRectangle()
+    const width = Math.max(0, rectangle.width - 4)
+    const height = Math.max(0, rectangle.height - 4)
+
+    if (!field.isMultiline()) {
+      return font.widthOfTextAtSize(value, fontSize) <= width
+        && font.heightAtSize(fontSize) <= height
+    }
+
+    const lines = wrappedLineCount(value, font, fontSize, width)
+    return Number.isFinite(lines) && lines * font.heightAtSize(fontSize) * 1.2 <= height
+  })
+}
+
+function legibleFontSize(field: PDFTextField, font: PDFFont, value: string): number | null {
+  for (let fontSize = 8; fontSize >= 6; fontSize -= 0.25) {
+    if (textFits(field, font, value, fontSize)) return fontSize
+  }
+  return null
+}
+
 function setTextField(
   form: ReturnType<PDFDocument['getForm']>,
   font: PDFFont,
@@ -66,7 +159,10 @@ function setTextField(
 
   assertFontSupports(font, value, fieldName)
   const field = form.getTextField(fieldName)
+  const fontSize = legibleFontSize(field, font, value)
+  if (fontSize === null) throw new PdfFieldOverflowError(fieldName)
   field.setText(value)
+  field.setFontSize(fontSize)
   field.updateAppearances(font)
 }
 
@@ -92,7 +188,16 @@ function formatBirthplace(data: Record<string, unknown>, prefix: string): string
     return [city, val(data, `${prefix}_birth_state`), 'Australia'].filter(Boolean).join(', ')
   }
 
-  return [city, val(data, `${prefix}_birth_state_international`), country].filter(Boolean).join(', ')
+  const seen = new Set<string>()
+  return [city, val(data, `${prefix}_birth_state_international`), country]
+    .filter((value) => {
+      if (!value) return false
+      const key = value.toLowerCase()
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+    .join(', ')
 }
 
 function mapDescription(value: string): string {

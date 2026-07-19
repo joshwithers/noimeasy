@@ -87,9 +87,11 @@ This application is designed to store as little data as possible:
 - The app supports all four official conjugal-status values, including `Divorce pending`.
 - Occupation fields suggest entries from the supplied occupation list while still accepting any custom occupation typed by the user.
 - Legal names are preserved exactly as entered. A family name is required unless the person explicitly states they do not have one; dashes, punctuation-only values and other placeholders are rejected.
-- The generated PDF embeds a Unicode font for Latin, Greek and Cyrillic names. If the PDF engine cannot safely lay out a script, submission stops with guidance to use the Roman-alphabet spelling from supporting evidence or ask the celebrant, rather than emitting broken glyphs.
-- Dates of birth are enforced on both the client and server: a party under 16 is rejected; a party aged 16 or 17 sees the court-approval and parent/guardian-consent requirements; and two parties under 18 are rejected.
+- The generated PDF embeds a Unicode font for Latin, Greek and Cyrillic names. It reduces text only to a legible minimum size and rejects values that still cannot fit, so legal particulars are never silently clipped. If the PDF engine cannot safely lay out a script, submission stops with guidance to use the Roman-alphabet spelling from supporting evidence or ask the celebrant, rather than emitting broken glyphs.
+- A proposed marriage date is collected for guidance only and is not inserted into the celebrant-only PDF fields. Age is enforced on that date on both the client and server: a party under 16 is rejected; a party aged 16 or 17 sees the court-approval and parent/guardian-consent requirements; and two parties under 18 are rejected.
+- Birthplace particulars may be entered as `Unknown` after reasonable inquiry; the checklist then explains the statutory-declaration requirement.
 - Parent 1 details must be entered or marked `Unknown` after reasonable inquiry. Parent 2 fields are included only where applicable.
+- PDF generation accepts form submissions only, rejects cross-site and oversized requests, and is rate-limited at the Worker edge.
 - From 12 June 2024, a NOIM may be witnessed in person or remotely by audio-visual link, subject to the Attorney-General's Department's location rules. The approved PDF still contains older physical-presence wording, so the site displays the current rule separately rather than altering the official form.
 
 ## Project structure

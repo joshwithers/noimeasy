@@ -1,6 +1,8 @@
 import type { Context } from 'hono'
 
-export type Bindings = Record<string, never>
+export interface Bindings {
+  PDF_RATE_LIMITER: RateLimit
+}
 
 export type Env = { Bindings: Bindings }
 export type AppContext = Context<Env>

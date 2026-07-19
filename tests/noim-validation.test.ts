@@ -6,8 +6,24 @@ import { ageOnDate, generateDocumentChecklist, getNoimClientScript } from '../sr
 import { addressSearchQuery, formatAustralianAddress, formatNominatimResults } from '../src/forms/noim/address.ts'
 import { safePdfFilename, validateNoimSubmission } from '../src/forms/noim/validation.ts'
 
+function isoDate(date: Date): string {
+  return date.toISOString().slice(0, 10)
+}
+
+function dateYearsFromNow(years: number): string {
+  const date = new Date()
+  date.setUTCFullYear(date.getUTCFullYear() + years)
+  return isoDate(date)
+}
+
+function dateForAgeOn(age: number, onDate: string): string {
+  const [year, month, day] = onDate.split('-').map(Number)
+  return isoDate(new Date(Date.UTC(year - age, month - 1, day)))
+}
+
 function validSubmission(): Record<string, string> {
   return {
+    proposed_marriage_date: dateYearsFromNow(1),
     p1_description: 'partner',
     p1_has_family_name: 'yes',
     p1_last_name: "O'NEILL",
@@ -50,12 +66,6 @@ function validSubmission(): Record<string, string> {
     parties_related: 'no',
     relationship_details: '',
   }
-}
-
-function dateForAge(age: number): string {
-  const today = new Date()
-  const date = new Date(Date.UTC(today.getUTCFullYear() - age, today.getUTCMonth(), today.getUTCDate()))
-  return date.toISOString().slice(0, 10)
 }
 
 const georgeStreetResult = {
@@ -145,6 +155,16 @@ test('rejects invalid choices, countries, and dates', () => {
   assert.match(result.errors.p2_dob, /valid date/)
 })
 
+test('requires a valid proposed marriage date for age guidance', () => {
+  const missing = validSubmission()
+  missing.proposed_marriage_date = ''
+  assert.match(validateNoimSubmission(missing).errors.proposed_marriage_date, /required/i)
+
+  const invalid = validSubmission()
+  invalid.proposed_marriage_date = '2027-02-31'
+  assert.match(validateNoimSubmission(invalid).errors.proposed_marriage_date, /valid date/i)
+})
+
 test('preserves legal-name casing and discards fields not on the party-completed NOIM', () => {
   const input = validSubmission()
   input.p1_last_name = "d'ARC-McDONALD"
@@ -212,17 +232,15 @@ test('offers every attached occupation while accepting a custom occupation', () 
   assert.equal(result.data.p1_occupation, 'Professional Button Tester')
 })
 
-test('rejects parties under 16, allows one 16–17-year-old with guidance, and rejects two', () => {
+test('assesses marriageability on the proposed marriage date', () => {
   const infant = validSubmission()
-  const oneMonthAgo = new Date()
-  oneMonthAgo.setUTCMonth(oneMonthAgo.getUTCMonth() - 1)
-  infant.p1_dob = oneMonthAgo.toISOString().slice(0, 10)
+  infant.p1_dob = dateForAgeOn(15, infant.proposed_marriage_date)
   const infantResult = validateNoimSubmission(infant)
   assert.equal(infantResult.valid, false)
   assert.match(infantResult.errors.p1_dob, /cannot accept a party under 16/i)
 
   const oneMinor = validSubmission()
-  oneMinor.p1_dob = dateForAge(17)
+  oneMinor.p1_dob = dateForAgeOn(17, oneMinor.proposed_marriage_date)
   const oneMinorResult = validateNoimSubmission(oneMinor)
   assert.equal(oneMinorResult.valid, true, JSON.stringify(oneMinorResult.errors))
   assert.match(
@@ -231,12 +249,18 @@ test('rejects parties under 16, allows one 16–17-year-old with guidance, and r
   )
 
   const twoMinors = validSubmission()
-  twoMinors.p1_dob = dateForAge(17)
-  twoMinors.p2_dob = dateForAge(16)
+  twoMinors.p1_dob = dateForAgeOn(17, twoMinors.proposed_marriage_date)
+  twoMinors.p2_dob = dateForAgeOn(16, twoMinors.proposed_marriage_date)
   const twoMinorsResult = validateNoimSubmission(twoMinors)
   assert.equal(twoMinorsResult.valid, false)
   assert.match(twoMinorsResult.errors.p1_dob, /only one party/i)
   assert.match(twoMinorsResult.errors.p2_dob, /only one party/i)
+
+  const currently17But18AtMarriage = validSubmission()
+  const marriageDate = currently17But18AtMarriage.proposed_marriage_date
+  currently17But18AtMarriage.p1_dob = dateForAgeOn(18, marriageDate)
+  const adultAtMarriageResult = validateNoimSubmission(currently17But18AtMarriage)
+  assert.equal(adultAtMarriageResult.valid, true, JSON.stringify(adultAtMarriageResult.errors))
 })
 
 test('detects age from date of birth and explains both under-18 cases', () => {
@@ -244,17 +268,39 @@ test('detects age from date of birth and explains both under-18 cases', () => {
   assert.equal(ageOnDate('2008-07-20', new Date('2026-07-19T12:00:00Z')), 17)
 
   const age17 = validSubmission()
-  age17.p1_dob = dateForAge(17)
+  age17.p1_dob = dateForAgeOn(17, age17.proposed_marriage_date)
   assert.match(
     generateDocumentChecklist(age17).map((item) => item.document).join('\n'),
     /court approval.*parent\/guardian consent.*only one party may be under 18/i,
   )
 
   const age15 = validSubmission()
-  age15.p1_dob = dateForAge(15)
+  age15.p1_dob = dateForAgeOn(15, age15.proposed_marriage_date)
   assert.match(
     generateDocumentChecklist(age15).map((item) => item.document).join('\n'),
     /under 16 cannot marry in Australia/i,
+  )
+})
+
+test('accepts unknown birthplace particulars and adds statutory-declaration guidance', () => {
+  const input = validSubmission()
+  input.p1_birth_country = 'Unknown'
+  input.p1_birth_city = 'Unknown'
+  input.p1_birth_state = ''
+
+  const result = validateNoimSubmission(input)
+  assert.equal(result.valid, true, JSON.stringify(result.errors))
+  assert.match(
+    generateDocumentChecklist(input).map((item) => item.document).join('\n'),
+    /statutory declaration.*reasonable inquiry/i,
+  )
+
+  const unknownCity = validSubmission()
+  unknownCity.p1_birth_city = 'Unknown'
+  assert.equal(validateNoimSubmission(unknownCity).valid, true)
+  assert.match(
+    generateDocumentChecklist(unknownCity).map((item) => item.document).join('\n'),
+    /statutory declaration.*reasonable inquiry/i,
   )
 })
 
@@ -272,6 +318,11 @@ test('ships a syntactically valid client script with the DOB pattern intact', ()
   assert.equal(script.includes('Finish editing to load suggestions automatically'), true)
   assert.equal(script.includes("status.textContent = 'Address selected.'"), true)
   assert.equal(script.includes('You can edit it manually if needed'), false)
+  assert.equal(script.includes('proposedMarriageDateInput'), true)
+  assert.equal(script.includes("event.key === 'ArrowDown'"), true)
+  assert.equal(script.includes("event.key === 'Enter'"), true)
+  assert.equal(script.includes('aria-activedescendant'), true)
+  assert.equal(script.includes('metadata.options[rawReviewValue]'), true)
 })
 
 test('creates an ASCII-safe attachment filename', () => {

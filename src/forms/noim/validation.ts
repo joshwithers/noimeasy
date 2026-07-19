@@ -21,7 +21,7 @@ function allowsUnknown(fieldName: string): boolean {
   return /_parent[12]_(?:current|birth)_name$/.test(fieldName)
 }
 
-function isValidDate(value: string): boolean {
+export function isValidDate(value: string): boolean {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
   if (!match) return false
 
@@ -30,6 +30,17 @@ function isValidDate(value: string): boolean {
   return date.getUTCFullYear() === year
     && date.getUTCMonth() === month - 1
     && date.getUTCDate() === day
+}
+
+function calendarDateInTimeZone(date: Date, timeZone: string): string {
+  const parts = new Intl.DateTimeFormat('en-AU', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date)
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value || ''
+  return `${part('year')}-${part('month')}-${part('day')}`
 }
 
 function maxLength(field: NoimField): number {
@@ -41,6 +52,17 @@ function maxLength(field: NoimField): number {
 export function validateNoimSubmission(input: Record<string, unknown>): NoimValidationResult {
   const data: Record<string, string> = {}
   const errors: Record<string, string> = {}
+  const proposedMarriageDate = typeof input.proposed_marriage_date === 'string'
+    ? input.proposed_marriage_date.trim()
+    : ''
+
+  if (!proposedMarriageDate) {
+    errors.proposed_marriage_date = 'Proposed marriage date is required for age guidance'
+  } else if (!isValidDate(proposedMarriageDate)) {
+    errors.proposed_marriage_date = 'Proposed marriage date must be a valid date'
+  } else if (proposedMarriageDate < calendarDateInTimeZone(new Date(), 'Australia/Melbourne')) {
+    errors.proposed_marriage_date = 'Proposed marriage date cannot be in the past'
+  }
 
   for (const field of fields) {
     const rawValue = input[field.name]
@@ -89,7 +111,7 @@ export function validateNoimSubmission(input: Record<string, unknown>): NoimVali
       errors[field.name] = `${field.label} has an invalid selection`
       continue
     }
-    if (field.type === 'country' && !countrySet.has(value)) {
+    if (field.type === 'country' && value.toLowerCase() !== 'unknown' && !countrySet.has(value)) {
       errors[field.name] = `${field.label} must be selected from the country list`
       continue
     }
@@ -111,7 +133,9 @@ export function validateNoimSubmission(input: Record<string, unknown>): NoimVali
     const value = data[fieldName]
     return {
       fieldName,
-      age: value && !errors[fieldName] && isValidDate(value) ? ageOnDate(value) : null,
+      age: value && !errors[fieldName] && isValidDate(value) && isValidDate(proposedMarriageDate)
+        ? ageOnDate(value, new Date(`${proposedMarriageDate}T12:00:00Z`))
+        : null,
     }
   })
 

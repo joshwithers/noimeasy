@@ -4,6 +4,7 @@ import test from 'node:test'
 import { PDFDocument } from 'pdf-lib'
 import {
   generateNoimPdfFromAssets,
+  PdfFieldOverflowError,
   UnsupportedPdfCharacterError,
 } from '../src/forms/noim/pdf-generator-core.ts'
 
@@ -83,4 +84,38 @@ test('rejects an unsupported PDF glyph instead of crashing or producing a missin
         && error.fieldName === 'Person1FamilyName',
     )
   }
+})
+
+test('shrinks long values to a legible size instead of clipping them', async () => {
+  const input = validSubmission()
+  input.p1_last_name = 'Alexandria-Montgomery-Worthington-Smythe-Cavendish'
+
+  const bytes = await generateNoimPdfFromAssets(input, templateBytes, fontBytes)
+  const field = (await PDFDocument.load(bytes)).getForm().getTextField('Person1FamilyName')
+  assert.equal(field.getText(), input.p1_last_name)
+  const appearance = field.acroField.getDefaultAppearance() || ''
+  const fontSize = Number(/\/DejaVuSans\s+([\d.]+)\s+Tf/.exec(appearance)?.[1])
+  assert.equal(fontSize >= 6 && fontSize < 8, true, appearance)
+})
+
+test('rejects accepted-length values that cannot fit the official field legibly', async () => {
+  const input = validSubmission()
+  input.p1_last_name = 'A'.repeat(160)
+
+  await assert.rejects(
+    () => generateNoimPdfFromAssets(input, templateBytes, fontBytes),
+    (error: unknown) => error instanceof PdfFieldOverflowError
+      && error.fieldName === 'Person1FamilyName',
+  )
+})
+
+test('does not repeat unknown birthplace particulars in the official field', async () => {
+  const input = validSubmission()
+  input.p1_birth_country = 'Unknown'
+  input.p1_birth_city = 'Unknown'
+  input.p1_birth_state_international = ''
+
+  const bytes = await generateNoimPdfFromAssets(input, templateBytes, fontBytes)
+  const field = (await PDFDocument.load(bytes)).getForm().getTextField('Person1Birthplace')
+  assert.equal(field.getText(), 'Unknown')
 })

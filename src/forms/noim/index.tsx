@@ -43,8 +43,12 @@ const NoimFieldComponent: FC<{ field: NoimField }> = ({ field }) => {
               placeholder="Start typing a country..."
               autocomplete="off"
               maxlength={160}
+              role="combobox"
+              aria-autocomplete="list"
+              aria-expanded="false"
+              aria-controls={`${field.name}-countries`}
             />
-            <div class="country-dropdown"></div>
+            <div id={`${field.name}-countries`} class="country-dropdown" role="listbox"></div>
           </div>
         ) : field.type === 'date' ? (
           <>
@@ -164,7 +168,25 @@ const NoimStepComponent: FC<{ step: NoimStep; index: number }> = ({ step, index 
       {step.description && <p>{step.description}</p>}
     </hgroup>
 
-    {step.id === 'documents' ? (
+    {step.id === 'party1-personal' ? (
+      <>
+        <div class="noim-field">
+          <label>
+            Proposed marriage date<span style="color:var(--required)"> *</span>
+            <input
+              type="date"
+              name="proposed_marriage_date"
+              required
+              data-was-required="true"
+            />
+          </label>
+          <small style="color:var(--text-hint)">
+            Used only to check age requirements. It is not added to the NOIM PDF.
+          </small>
+        </div>
+        {step.fields.map((field) => <NoimFieldComponent field={field} />)}
+      </>
+    ) : step.id === 'documents' ? (
       <div id="document-checklist">
         <p style="color:var(--text-muted)">Navigate to this step after filling in your details to see your required documents.</p>
       </div>
@@ -334,12 +356,13 @@ export const NoimFormPage: FC<{ submitUrl: string }> = ({ submitUrl }) => (
           box-shadow: 0 4px 12px var(--dropdown-shadow);
         }
         .country-option {
-          padding: 10px 14px; cursor: pointer; font-size: 15px;
+          display:block;width:100%;margin:0;padding:10px 14px;cursor:pointer;font-size:15px;
+          border:0;border-radius:0;background:transparent;text-align:left;
           border-bottom: 1px solid var(--border-subtle);
           color: var(--text);
         }
         .country-option:last-child { border-bottom: none; }
-        .country-option:hover, .country-option:focus {
+        .country-option:hover, .country-option:focus, .country-option.active {
           background: var(--surface-hover);
         }
         .country-option[style*="display: none"] + .country-option { border-top: none; }

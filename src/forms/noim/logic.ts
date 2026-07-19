@@ -1,5 +1,13 @@
-import type { NoimCondition } from './schema.ts'
+import { noimSteps, type NoimCondition } from './schema.ts'
 import { COUNTRIES } from '../shared/countries.ts'
+
+const reviewMetadata = Object.fromEntries(
+  noimSteps.flatMap((step) => step.fields).map((field) => [field.name, {
+    label: field.label,
+    type: field.type,
+    options: Object.fromEntries(field.options?.map((option) => [option.value, option.label]) || []),
+  }]),
+)
 
 /**
  * Check if a field should be visible given the current form data.
@@ -52,8 +60,14 @@ export function ageOnDate(dateOfBirth: string, onDate = new Date()): number | nu
   return age
 }
 
-export function generateDocumentChecklist(data: Record<string, string>): DocumentItem[] {
+export function generateDocumentChecklist(
+  data: Record<string, string>,
+  proposedMarriageDate = data.proposed_marriage_date,
+): DocumentItem[] {
   const docs: DocumentItem[] = []
+  const assessmentDate = /^\d{4}-\d{2}-\d{2}$/.test(proposedMarriageDate || '')
+    ? new Date(`${proposedMarriageDate}T12:00:00Z`)
+    : new Date()
 
   for (const prefix of ['p1', 'p2']) {
     const partyLabel = prefix === 'p1' ? 'Party 1' : 'Party 2'
@@ -67,14 +81,14 @@ export function generateDocumentChecklist(data: Record<string, string>): Documen
       required: true,
     })
 
-    const age = ageOnDate(data[`${prefix}_dob`] || '')
+    const age = ageOnDate(data[`${prefix}_dob`] || '', assessmentDate)
     if (age !== null && age < 18) {
       docs.push({
         document: age < 16
           ? 'A person under 16 cannot marry in Australia — contact an authorised celebrant immediately'
           : 'Under-18 marriage requirements: court approval from a judge or magistrate and parent/guardian consent are required unless that consent is dispensed with; only one party may be under 18',
         party: name,
-        reason: `The entered date of birth indicates this party is currently ${age}`,
+        reason: `The entered date of birth indicates this party will be ${age} on the proposed marriage date`,
         required: true,
       })
     }
@@ -98,9 +112,22 @@ export function generateDocumentChecklist(data: Record<string, string>): Documen
       })
     }
 
-    // Check if birth country is not Australia — may need translation
+    // Unknown birthplace particulars require the statutory-declaration pathway.
     const birthCountry = (data[`${prefix}_birth_country`] || '').toLowerCase()
-    if (birthCountry && birthCountry !== 'australia') {
+    const birthplaceUnknown = [
+      data[`${prefix}_birth_country`],
+      data[`${prefix}_birth_city`],
+      data[`${prefix}_birth_state`],
+      data[`${prefix}_birth_state_international`],
+    ].some((value) => (value || '').trim().toLowerCase() === 'unknown')
+    if (birthplaceUnknown) {
+      docs.push({
+        document: 'Statutory declaration explaining that birthplace particulars could not be ascertained after reasonable inquiry',
+        party: name,
+        reason: 'Birthplace particulars were entered as unknown',
+        required: true,
+      })
+    } else if (birthCountry && birthCountry !== 'australia') {
       docs.push({
         document: 'Accredited translation of any non-English documents (confirm requirements with your celebrant)',
         party: name,
@@ -118,7 +145,7 @@ export function generateDocumentChecklist(data: Record<string, string>): Documen
  * This is injected as a <script> tag and handles:
  * - Conditional field visibility
  * - Step navigation
- * - Explicit OpenStreetMap address search
+ * - Completed-address OpenStreetMap lookup
  * - Client-side validation before step transitions
  */
 export function getNoimClientScript(): string {
@@ -131,8 +158,13 @@ export function getNoimClientScript(): string {
   var submitBtn = document.getElementById('submit-btn');
   var submitBtnTop = document.getElementById('submit-btn-top');
   var stepIndicator = document.getElementById('step-indicator');
+  var proposedMarriageDateInput = form.querySelector('[name="proposed_marriage_date"]');
   var currentStep = 0;
-  var COUNTRIES = ${JSON.stringify(COUNTRIES)};
+  var COUNTRIES = ${JSON.stringify(['Unknown', ...COUNTRIES])};
+  var REVIEW_METADATA = ${JSON.stringify({
+    proposed_marriage_date: { label: 'Proposed marriage date', type: 'date', options: {} },
+    ...reviewMetadata,
+  })};
 
   // === Step Navigation ===
   function showStep(index) {
@@ -220,23 +252,26 @@ export function getNoimClientScript(): string {
     return (el.value || '').trim();
   }
 
-  function ageFromDob(dateOfBirth) {
+  function ageFromDob(dateOfBirth, assessmentDate) {
     var match = /^(\\d{4})-(\\d{2})-(\\d{2})$/.exec(dateOfBirth);
-    if (!match) return null;
-    var today = new Date();
+    var assessmentMatch = /^(\\d{4})-(\\d{2})-(\\d{2})$/.exec(assessmentDate || '');
+    if (!match || !assessmentMatch) return null;
     var year = Number(match[1]);
     var month = Number(match[2]);
     var day = Number(match[3]);
-    var age = today.getUTCFullYear() - year;
-    var birthdayHasPassed = today.getUTCMonth() + 1 > month ||
-      (today.getUTCMonth() + 1 === month && today.getUTCDate() >= day);
+    var assessmentYear = Number(assessmentMatch[1]);
+    var assessmentMonth = Number(assessmentMatch[2]);
+    var assessmentDay = Number(assessmentMatch[3]);
+    var age = assessmentYear - year;
+    var birthdayHasPassed = assessmentMonth > month ||
+      (assessmentMonth === month && assessmentDay >= day);
     return birthdayHasPassed ? age : age - 1;
   }
 
-  function updateDobNotice(input) {
+  function updateDobNotice(input, assessmentDate) {
     var note = input.parentElement.querySelector('.dob-age-note');
     if (!note) return;
-    var age = ageFromDob(input.value);
+    var age = ageFromDob(input.value, assessmentDate);
     input.setCustomValidity('');
     note.className = 'dob-age-note';
     note.textContent = '';
@@ -256,9 +291,10 @@ export function getNoimClientScript(): string {
 
   function updateAllDobNotices() {
     var dobInputs = Array.from(document.querySelectorAll('input[name$="_dob"]'));
-    dobInputs.forEach(updateDobNotice);
+    var assessmentDate = proposedMarriageDateInput ? proposedMarriageDateInput.value : '';
+    dobInputs.forEach(function(input) { updateDobNotice(input, assessmentDate); });
     var partiesAged16Or17 = dobInputs.filter(function(input) {
-      var age = ageFromDob(input.value);
+      var age = ageFromDob(input.value, assessmentDate);
       return age !== null && age >= 16 && age < 18;
     });
     if (partiesAged16Or17.length > 1) {
@@ -278,6 +314,16 @@ export function getNoimClientScript(): string {
     input.addEventListener('input', updateAllDobNotices);
     input.addEventListener('change', updateAllDobNotices);
   });
+  if (proposedMarriageDateInput) {
+    var localToday = new Date();
+    proposedMarriageDateInput.min = [
+      localToday.getFullYear(),
+      String(localToday.getMonth() + 1).padStart(2, '0'),
+      String(localToday.getDate()).padStart(2, '0')
+    ].join('-');
+    proposedMarriageDateInput.addEventListener('input', updateAllDobNotices);
+    proposedMarriageDateInput.addEventListener('change', updateAllDobNotices);
+  }
   updateAllDobNotices();
 
   // === Conditional field visibility ===
@@ -329,12 +375,27 @@ export function getNoimClientScript(): string {
     var dropdown = wrapper.querySelector('.country-dropdown');
     if (!search || !dropdown) return;
     var built = false;
+    var activeIndex = -1;
+    var visibleOptions = [];
+
+    function setExpanded(expanded) {
+      search.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+      dropdown.style.display = expanded ? 'block' : 'none';
+      if (!expanded) {
+        activeIndex = -1;
+        search.removeAttribute('aria-activedescendant');
+      }
+    }
 
     function buildOptions() {
       if (built) return;
-      COUNTRIES.forEach(function(c) {
-        var opt = document.createElement('div');
+      COUNTRIES.forEach(function(c, index) {
+        var opt = document.createElement('button');
+        opt.type = 'button';
         opt.className = 'country-option';
+        opt.id = search.name + '-country-' + index;
+        opt.setAttribute('role', 'option');
+        opt.setAttribute('aria-selected', 'false');
         opt.dataset.value = c;
         opt.textContent = c;
         dropdown.appendChild(opt);
@@ -344,40 +405,76 @@ export function getNoimClientScript(): string {
 
     function filterOptions() {
       var query = search.value.toLowerCase().trim();
-      var options = dropdown.querySelectorAll('.country-option');
+      var options = Array.from(dropdown.querySelectorAll('.country-option'));
+      visibleOptions = [];
       options.forEach(function(opt) {
         var match = !query || opt.textContent.toLowerCase().indexOf(query) !== -1;
         opt.style.display = match ? '' : 'none';
+        if (match) visibleOptions.push(opt);
       });
+      activeIndex = -1;
+      updateActiveOption();
+    }
+
+    function selectCountry(option) {
+      if (!option) return;
+      search.value = option.dataset.value;
+      setExpanded(false);
+      updateConditionalFields();
+    }
+
+    function updateActiveOption() {
+      dropdown.querySelectorAll('.country-option').forEach(function(option) {
+        var active = visibleOptions[activeIndex] === option;
+        option.classList.toggle('active', active);
+        option.setAttribute('aria-selected', active ? 'true' : 'false');
+      });
+      var activeOption = visibleOptions[activeIndex];
+      if (activeOption) search.setAttribute('aria-activedescendant', activeOption.id);
+      else search.removeAttribute('aria-activedescendant');
     }
 
     search.addEventListener('focus', function() {
       buildOptions();
       filterOptions();
-      dropdown.style.display = 'block';
+      setExpanded(true);
     });
 
     search.addEventListener('input', function() {
       buildOptions();
       filterOptions();
-      dropdown.style.display = 'block';
+      setExpanded(true);
+    });
+
+    search.addEventListener('keydown', function(event) {
+      if (event.key === 'Escape') {
+        setExpanded(false);
+        return;
+      }
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        if (!visibleOptions.length) return;
+        event.preventDefault();
+        var direction = event.key === 'ArrowDown' ? 1 : -1;
+        activeIndex = (activeIndex + direction + visibleOptions.length) % visibleOptions.length;
+        updateActiveOption();
+        return;
+      }
+      if (event.key === 'Enter' && activeIndex >= 0) {
+        event.preventDefault();
+        selectCountry(visibleOptions[activeIndex]);
+      }
     });
 
     // Use mousedown so it fires before the blur event closes the dropdown
     dropdown.addEventListener('mousedown', function(e) {
       e.preventDefault();
       var opt = e.target.closest('.country-option');
-      if (opt) {
-        search.value = opt.dataset.value;
-        dropdown.style.display = 'none';
-        // Fire change to update conditional fields (e.g. birth_state depends on birth_country)
-        updateConditionalFields();
-      }
+      if (opt) selectCountry(opt);
     });
 
     search.addEventListener('blur', function() {
       setTimeout(function() {
-        dropdown.style.display = 'none';
+        setExpanded(false);
         // Validate: value must match a known country exactly
         var val = search.value.trim();
         if (val) {
@@ -552,7 +649,7 @@ export function getNoimClientScript(): string {
       container.appendChild(createDocItem('Proof of date and place of birth: official birth certificate or extract, Australian passport, or overseas passport'));
       container.appendChild(createDocItem('Photo ID to prove identity (e.g. passport, driver licence, or government-issued photo ID)'));
 
-      var age = ageFromDob(getFieldValue(prefix + '_dob'));
+      var age = ageFromDob(getFieldValue(prefix + '_dob'), getFieldValue('proposed_marriage_date'));
       if (age !== null && age < 16) {
         container.appendChild(createDocItem('The entered date of birth indicates this party is under 16. A person under 16 cannot marry in Australia. Contact an authorised celebrant immediately.'));
       } else if (age !== null && age < 18) {
@@ -573,7 +670,15 @@ export function getNoimClientScript(): string {
 
       // Translation needed for non-Australian birth
       var country = getFieldValue(prefix + '_birth_country').toLowerCase();
-      if (country && country !== 'australia') {
+      var birthplaceUnknown = [
+        getFieldValue(prefix + '_birth_country'),
+        getFieldValue(prefix + '_birth_city'),
+        getFieldValue(prefix + '_birth_state'),
+        getFieldValue(prefix + '_birth_state_international')
+      ].some(function(value) { return value.toLowerCase() === 'unknown'; });
+      if (birthplaceUnknown) {
+        container.appendChild(createDocItem('Give your celebrant a statutory declaration explaining why the birthplace particulars could not be ascertained after reasonable inquiry'));
+      } else if (country && country !== 'australia') {
         container.appendChild(createDocItem('Ask your celebrant whether an accredited translation is required for any non-English documents'));
       }
     });
@@ -603,15 +708,25 @@ export function getNoimClientScript(): string {
         if (wrapper && wrapper.style.display === 'none') continue;
       }
       var tr = document.createElement('tr');
-      var label = key.replace(/^p[12]_/, '').replace(/_/g, ' ');
+      var metadata = REVIEW_METADATA[key];
+      var label = metadata ? metadata.label : key.replace(/^p[12]_/, '').replace(/_/g, ' ');
       label = label.charAt(0).toUpperCase() + label.slice(1);
-      if (key.startsWith('p1_')) label = 'Party 1: ' + label;
-      if (key.startsWith('p2_')) label = 'Party 2: ' + label;
+      if (key.startsWith('p1_') && label.indexOf('Party 1') === -1) label = 'Party 1: ' + label;
+      if (key.startsWith('p2_') && label.indexOf('Party 2') === -1) label = 'Party 2: ' + label;
       var labelCell = document.createElement('td');
       labelCell.style.fontWeight = '600';
       labelCell.textContent = label;
       var valueCell = document.createElement('td');
-      valueCell.textContent = String(formData[key]);
+      var rawReviewValue = String(formData[key]);
+      var reviewValue = metadata && metadata.options[rawReviewValue]
+        ? metadata.options[rawReviewValue]
+        : rawReviewValue;
+      if (metadata && metadata.type === 'date' && /^\\d{4}-\\d{2}-\\d{2}$/.test(rawReviewValue)) {
+        reviewValue = new Intl.DateTimeFormat('en-AU', {
+          day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC'
+        }).format(new Date(rawReviewValue + 'T12:00:00Z'));
+      }
+      valueCell.textContent = reviewValue;
       tr.appendChild(labelCell);
       tr.appendChild(valueCell);
       table.appendChild(tr);

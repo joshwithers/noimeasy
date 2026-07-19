@@ -2,9 +2,14 @@ import { Hono } from 'hono'
 import type { Env } from './types'
 import { NoimFormPage } from './forms/noim/index'
 import { markdownToHtml } from './landing'
-import { generateNoimPdf, UnsupportedPdfCharacterError } from './forms/noim/pdf-generator'
+import { generateNoimPdf, PdfFieldOverflowError, UnsupportedPdfCharacterError } from './forms/noim/pdf-generator'
 import { safePdfFilename, validateNoimSubmission } from './forms/noim/validation'
 import { addressSearchQuery, formatNominatimResults } from './forms/noim/address'
+import {
+  FormBodyTooLargeError,
+  formRequestRejection,
+  parseFormBodyWithLimit,
+} from './lib/form-request'
 import landingMd from '../content/landing.md'
 import logoSvg from '../content/logo.svg'
 import faviconPng from '../content/favicon.png'
@@ -294,7 +299,32 @@ app.get('/prepare', (c) => {
 
 // === Form submission ===
 app.post('/submit', async (c) => {
-  const body = await c.req.parseBody()
+  const requestRejection = formRequestRejection(c.req.raw)
+  if (requestRejection) {
+    return c.json({ ok: false, error: requestRejection.error }, requestRejection.status)
+  }
+
+  const rateLimitKey = c.req.header('CF-Connecting-IP')
+    || c.req.header('X-Forwarded-For')?.split(',')[0]?.trim()
+    || 'anonymous'
+  const rateLimit = await c.env.PDF_RATE_LIMITER.limit({ key: `pdf:${rateLimitKey}` })
+  if (!rateLimit.success) {
+    return c.json(
+      { ok: false, error: 'Too many PDF requests. Please wait a minute and try again.' },
+      429,
+      { 'Retry-After': '60' },
+    )
+  }
+
+  let body: Record<string, unknown>
+  try {
+    body = await parseFormBodyWithLimit(c.req.raw)
+  } catch (error) {
+    if (error instanceof FormBodyTooLargeError) {
+      return c.json({ ok: false, error: 'Form submission is too large.' }, 413)
+    }
+    throw error
+  }
 
   // Honeypot check
   if (typeof body['_hp'] === 'string' && body['_hp'].trim()) {
@@ -317,6 +347,12 @@ app.post('/submit', async (c) => {
       return c.json({
         ok: false,
         error: `The character ${JSON.stringify(error.character)} cannot be rendered safely in the official NOIM PDF. Please use the spelling shown in the Roman-alphabet section of the supporting document, or ask your celebrant for help.`,
+      }, 422)
+    }
+    if (error instanceof PdfFieldOverflowError) {
+      return c.json({
+        ok: false,
+        error: `${error.fieldLabel} is too long to fit legibly in the official NOIM PDF. Check the particulars against the supporting documents and ask an authorised celebrant for help rather than letting the legal form clip them.`,
       }, 422)
     }
     throw error

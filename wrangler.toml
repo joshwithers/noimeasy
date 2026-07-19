@@ -8,6 +8,14 @@ routes = [
   { pattern = "noimeasy.au", custom_domain = true }
 ]
 
+[[ratelimits]]
+name = "PDF_RATE_LIMITER"
+namespace_id = "42001"
+
+  [ratelimits.simple]
+  limit = 5
+  period = 60
+
 [[rules]]
 type = "Data"
 globs = ["**/*.pdf", "**/*.png", "**/*.ttf"]
