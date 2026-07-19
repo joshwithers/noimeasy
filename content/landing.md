@@ -8,12 +8,7 @@ The NOIM is a legal form required under **Section 42 of the Marriage Act 1961**.
 
 This app walks you through the form step by step, then generates a **completed PDF** ready to download and print.
 
-Here's what happens after:
-
-1. **Print the PDF** or **prepare it to be on a device like an iPad where you can digitally sign**
-2. **Sign it in the presence of an authorised witness** — in person or, where the current location rules allow it, remotely by audio-visual link
-3. **Give the signed NOIM to your celebrant** along with your supporting documents
-4. Your celebrant verifies everything, your **one month notice period begins**, and you're on your way to getting married
+[[NOTICE_PROCESS]]
 
 ## Your privacy is protected
 
@@ -56,12 +51,13 @@ Your NOIM must be signed in the presence of an authorised witness. Since 12 June
 If you sign in Australia, the witness can be:
 
 - An **authorised marriage celebrant** (including your own celebrant)
+- A **Commissioner for Declarations** under the Statutory Declarations Act 1959
 - A **Justice of the Peace (JP)**
 - A **barrister or solicitor**
 - A **medical practitioner**
 - A **member of the Australian Federal Police or state/territory police force**
 
-If you sign outside Australia, the witness can be an **Australian Diplomatic Officer**, **Australian Consular Officer**, **notary public**, or another overseas witness category listed on the official form. An authorised celebrant cannot witness a person who is outside Australia. For remote witnessing, the witness must be in Australia when the signing party is in Australia, or outside Australia when the signing party is outside Australia.
+If you sign outside Australia, the witness can be an **Australian Diplomatic Officer**, **Australian Consular Officer**, **notary public**, an appropriately authorised Commonwealth employee, or an appropriately authorised Australian Trade and Investment Commission employee. For remote witnessing, the witness must be in Australia when the signing party is in Australia, or outside Australia when the signing party is outside Australia.
 
 Your celebrant separately confirms what identity and supporting documents they need to sight before the marriage.
 

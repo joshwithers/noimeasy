@@ -10,6 +10,7 @@ import {
   formRequestRejection,
   parseFormBodyWithLimit,
 } from './lib/form-request'
+import { getNoticePeriodCalculatorScript } from './lib/notice-period'
 import landingMd from '../content/landing.md'
 import logoSvg from '../content/logo.svg'
 import faviconPng from '../content/favicon.png'
@@ -103,7 +104,9 @@ app.get('/address-search', async (c) => {
 
 // === Landing page ===
 app.get('/', (c) => {
-  const content = markdownToHtml(landingMd)
+  const [beforeProcessMd, afterProcessMd = ''] = landingMd.split('[[NOTICE_PROCESS]]')
+  const beforeProcessContent = markdownToHtml(beforeProcessMd)
+  const afterProcessContent = markdownToHtml(afterProcessMd)
   return c.html(
     '<!DOCTYPE html>' +
     (<html lang="en">
@@ -140,6 +143,10 @@ app.get('/', (c) => {
             --cta-text: #fff;
             --cta-hover: #333;
             --accent-border: #111;
+            --card-shadow:
+              0 0 0 1px rgba(0,0,0,0.07),
+              0 1px 2px -1px rgba(0,0,0,0.07),
+              0 4px 12px rgba(0,0,0,0.05);
           }
           @media (prefers-color-scheme: dark) {
             :root {
@@ -156,8 +163,10 @@ app.get('/', (c) => {
               --cta-text: #111;
               --cta-hover: #d0d0d0;
               --accent-border: #e4e4e4;
+              --card-shadow: 0 0 0 1px rgba(255,255,255,0.1);
             }
           }
+          html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
           body { background: var(--bg); color: var(--text); }
           .site-header {
             background: var(--header-bg);
@@ -168,6 +177,8 @@ app.get('/', (c) => {
           .site-header .container {
             display: flex;
             align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
             max-width: 700px;
             margin: 0 auto;
             padding: 0 1rem;
@@ -176,11 +187,84 @@ app.get('/', (c) => {
             height: 32px;
             width: auto;
           }
+          .header-cta {
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            min-height:44px;
+            padding:10px 17px;
+            border-radius:4px;
+            background:#fff;
+            color:#111;
+            box-shadow:0 0 0 1px rgba(255,255,255,0.16), 0 2px 8px rgba(0,0,0,0.2);
+            text-decoration:none;
+            font-weight:650;
+            font-size:0.9rem;
+            white-space:nowrap;
+            transition-property:background-color, scale, box-shadow;
+            transition-duration:150ms;
+            transition-timing-function:ease-out;
+          }
+          .header-cta:hover { background:#f0f0f0; box-shadow:0 0 0 1px rgba(255,255,255,0.22), 0 3px 10px rgba(0,0,0,0.28); }
+          .header-cta:active { scale:0.96; }
           .landing { max-width: 700px; margin: 0 auto; padding-top: 0.5rem; }
-          .landing h1 { margin-top: 2rem; margin-bottom: 0.5rem; color: var(--text); }
-          .landing h2 { color: var(--text); border-bottom: 1px solid var(--border); padding-bottom: 0.4rem; }
+          .landing h1 { margin-top: 2rem; margin-bottom: 0.5rem; color: var(--text); text-wrap:balance; }
+          .landing h2 { color: var(--text); border-bottom: 1px solid var(--border); padding-bottom: 0.4rem; text-wrap:balance; }
           .landing h3 { color: var(--text-secondary); }
+          .landing p, .landing li { text-wrap:pretty; }
           .landing hr { margin: 2rem 0; border-color: var(--border); }
+          .process-section { margin:2.5rem 0 3rem; }
+          .process-intro { color:var(--text-muted); margin-bottom:1.25rem; }
+          .process-steps { display:grid; gap:0.75rem; margin:0; padding:0; list-style:none; counter-reset:noim-step; }
+          .process-step {
+            display:grid;
+            grid-template-columns:44px minmax(0,1fr);
+            gap:1rem;
+            align-items:start;
+            padding:1.1rem 1.15rem;
+            border-radius:8px;
+            background:var(--bg);
+            box-shadow:var(--card-shadow);
+          }
+          .process-number {
+            display:grid;
+            place-items:center;
+            width:44px;
+            height:44px;
+            border-radius:50%;
+            background:var(--text);
+            color:var(--bg);
+            font-weight:750;
+            font-variant-numeric:tabular-nums;
+          }
+          .process-step h3 { margin:0 0 0.25rem; color:var(--text); font-size:1rem; }
+          .process-step p { margin:0; color:var(--text-muted); font-size:0.92rem; line-height:1.55; }
+          .notice-calculator {
+            margin:3rem 0;
+            padding:1.5rem;
+            border-radius:14px;
+            background:var(--surface);
+            box-shadow:var(--card-shadow);
+          }
+          .notice-calculator h2 { margin-top:0; }
+          .notice-calculator > p { color:var(--text-muted); }
+          .notice-date-label { display:block; margin:1.25rem 0 0.4rem; font-weight:650; color:var(--text); }
+          #notice-received-date { min-height:48px; margin-bottom:1rem; font-variant-numeric:tabular-nums; }
+          .notice-window { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:0.75rem; margin-top:0.25rem; }
+          .notice-result {
+            min-width:0;
+            padding:1rem;
+            border-radius:6px;
+            background:var(--bg);
+            box-shadow:var(--card-shadow);
+          }
+          .notice-result-label { display:block; margin-bottom:0.35rem; color:var(--text-muted); font-size:0.78rem; font-weight:700; letter-spacing:0.04em; text-transform:uppercase; }
+          .notice-result strong { display:block; color:var(--text); font-size:1.08rem; line-height:1.35; font-variant-numeric:tabular-nums; text-wrap:balance; }
+          #notice-period-explanation { min-height:2.9em; margin:0.9rem 0 0; color:var(--text-muted); font-size:0.84rem; line-height:1.45; }
+          .notice-received-summary { margin:0.8rem 0 0; color:var(--text-muted); font-size:0.82rem; }
+          .notice-received-summary strong { color:var(--text); font-variant-numeric:tabular-nums; }
+          .notice-rule { margin-top:1rem; padding-top:1rem; border-top:1px solid var(--border); color:var(--text-muted); font-size:0.8rem; line-height:1.5; }
+          .notice-rule a { color:inherit; }
           .cta { text-align: center; margin: 2.5rem 0; }
           .cta a {
             display: inline-block;
@@ -242,17 +326,96 @@ app.get('/', (c) => {
           }
           .open-source:hover { border-color: var(--text-muted); color: var(--text-secondary); }
           .open-source svg { flex-shrink: 0; }
+          @media (max-width: 520px) {
+            .site-header img { height:28px; max-width:150px; }
+            .header-cta { min-height:40px; padding:8px 12px; font-size:0.82rem; }
+            .process-step { grid-template-columns:40px minmax(0,1fr); gap:0.75rem; padding:1rem; }
+            .process-number { width:40px; height:40px; }
+            .notice-calculator { padding:1.1rem; border-radius:12px; }
+            .notice-window { grid-template-columns:1fr; }
+          }
         `}</style>
       </head>
       <body>
         <div class="site-header">
           <div class="container">
-            <img src="/logo.svg" alt="NOIM Easy" width="187" height="32" />
+            <a href="/" aria-label="NOIM Easy home">
+              <img src="/logo.svg" alt="NOIM Easy" width="187" height="32" />
+            </a>
+            <nav aria-label="Primary navigation">
+              <a class="header-cta" href="/prepare">Prepare a NOIM</a>
+            </nav>
           </div>
         </div>
 
         <main class="container landing">
-          <div dangerouslySetInnerHTML={{ __html: content }} />
+          <div dangerouslySetInnerHTML={{ __html: beforeProcessContent }} />
+
+          <section class="process-section" aria-labelledby="after-noim-heading">
+            <h2 id="after-noim-heading">What happens after your PDF is created?</h2>
+            <p class="process-intro">
+              Creating the PDF prepares the form. It does not give legal notice by itself.
+            </p>
+            <ol class="process-steps">
+              <li class="process-step">
+                <span class="process-number" aria-hidden="true">1</span>
+                <div>
+                  <h3>Review the prepared NOIM</h3>
+                  <p>Download the PDF and check every detail against your supporting documents before anyone signs it.</p>
+                </div>
+              </li>
+              <li class="process-step">
+                <span class="process-number" aria-hidden="true">2</span>
+                <div>
+                  <h3>Sign under an authorised witness's observation</h3>
+                  <p>Each party signs in person or by audio-visual link under the current location rules. The witness can be one of the authorised people listed below, including the celebrant who will marry you.</p>
+                </div>
+              </li>
+              <li class="process-step">
+                <span class="process-number" aria-hidden="true">3</span>
+                <div>
+                  <h3>Give the signed NOIM to your celebrant</h3>
+                  <p>Your celebrant can receive the completed and witnessed NOIM physically or as a scanned or emailed copy. They will review it and record the date received.</p>
+                </div>
+              </li>
+              <li class="process-step">
+                <span class="process-number" aria-hidden="true">4</span>
+                <div>
+                  <h3>The legal notice window begins</h3>
+                  <p>The one-month period starts when the celebrant receives the completed and signed NOIM—not when this PDF is generated, a booking is made, or a deposit is paid. The marriage must ordinarily occur within the following 18-month window.</p>
+                </div>
+              </li>
+            </ol>
+          </section>
+
+          <section class="notice-calculator" aria-labelledby="notice-calculator-heading">
+            <h2 id="notice-calculator-heading">When can you get married?</h2>
+            <p>Choose the date your celebrant receives the completed and signed NOIM.</p>
+            <label class="notice-date-label" for="notice-received-date">Date received by celebrant</label>
+            <input type="date" id="notice-received-date" aria-describedby="notice-rule-note" />
+
+            <div class="notice-window" aria-live="polite">
+              <div class="notice-result">
+                <span class="notice-result-label">Earliest ordinary marriage date</span>
+                <strong id="earliest-marriage-output">—</strong>
+              </div>
+              <div class="notice-result">
+                <span class="notice-result-label">Notice valid through</span>
+                <strong id="latest-marriage-output">—</strong>
+              </div>
+            </div>
+            <p class="notice-received-summary">Calculated from receipt on <strong id="notice-received-output">—</strong>.</p>
+            <p id="notice-period-explanation"></p>
+            <p class="notice-rule" id="notice-rule-note">
+              This applies the calendar-month rule in section 2G of the
+              {' '}<a href="https://www.legislation.gov.au/Current/C1901A00002">Acts Interpretation Act 1901</a>
+              {' '}to the one-to-18-month window in section 42 of the
+              {' '}<a href="https://www.legislation.gov.au/Current/C1961A00012">Marriage Act 1961</a>.
+              It assumes no prescribed authority has approved a shorter notice period. Your celebrant must confirm the final dates.
+            </p>
+          </section>
+
+          <div dangerouslySetInnerHTML={{ __html: afterProcessContent }} />
 
           <div class="privacy-notice">
             <h3>Privacy notice</h3>
@@ -282,6 +445,7 @@ app.get('/', (c) => {
             </a>
           </div>
         </footer>
+        <script dangerouslySetInnerHTML={{ __html: getNoticePeriodCalculatorScript() }} />
       </body>
     </html>).toString()
   )
