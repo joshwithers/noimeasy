@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { noimSteps } from '../src/forms/noim/schema.ts'
 import { ageOnDate, generateDocumentChecklist, getNoimClientScript } from '../src/forms/noim/logic.ts'
@@ -48,6 +49,12 @@ function validSubmission(): Record<string, string> {
     parties_related: 'no',
     relationship_details: '',
   }
+}
+
+function dateForAge(age: number): string {
+  const today = new Date()
+  const date = new Date(Date.UTC(today.getUTCFullYear() - age, today.getUTCMonth(), today.getUTCDate()))
+  return date.toISOString().slice(0, 10)
 }
 
 test('accepts every official conjugal status, including divorce pending', () => {
@@ -129,19 +136,71 @@ test('the public schema does not collect celebrant-only booking or evidence fiel
   assert.equal(names.some((name) => /email/.test(name)), false)
 })
 
+test('defaults both legal-family-name questions to yes', () => {
+  const familyNameQuestions = noimSteps
+    .flatMap((step) => step.fields)
+    .filter((field) => field.name.endsWith('_has_family_name'))
+  assert.equal(familyNameQuestions.length, 2)
+  assert.deepEqual(familyNameQuestions.map((field) => field.defaultValue), ['yes', 'yes'])
+})
+
+test('offers every attached occupation while accepting a custom occupation', () => {
+  const occupations = readFileSync(
+    new URL('../src/forms/noim/occupations.txt', import.meta.url),
+    'utf8',
+  ).trim().split(/\r?\n/u)
+  assert.equal(occupations.length, 3338)
+  assert.equal(new Set(occupations).size, 3338)
+  assert.equal(occupations.includes('Accountant (General)'), true)
+  assert.equal(occupations.includes('Zoologist'), true)
+
+  const input = validSubmission()
+  input.p1_occupation = 'Professional Button Tester'
+  const result = validateNoimSubmission(input)
+  assert.equal(result.valid, true, JSON.stringify(result.errors))
+  assert.equal(result.data.p1_occupation, 'Professional Button Tester')
+})
+
+test('rejects parties under 16, allows one 16–17-year-old with guidance, and rejects two', () => {
+  const infant = validSubmission()
+  const oneMonthAgo = new Date()
+  oneMonthAgo.setUTCMonth(oneMonthAgo.getUTCMonth() - 1)
+  infant.p1_dob = oneMonthAgo.toISOString().slice(0, 10)
+  const infantResult = validateNoimSubmission(infant)
+  assert.equal(infantResult.valid, false)
+  assert.match(infantResult.errors.p1_dob, /cannot accept a party under 16/i)
+
+  const oneMinor = validSubmission()
+  oneMinor.p1_dob = dateForAge(17)
+  const oneMinorResult = validateNoimSubmission(oneMinor)
+  assert.equal(oneMinorResult.valid, true, JSON.stringify(oneMinorResult.errors))
+  assert.match(
+    generateDocumentChecklist(oneMinor).map((item) => item.document).join('\n'),
+    /court approval.*parent\/guardian consent.*only one party may be under 18/i,
+  )
+
+  const twoMinors = validSubmission()
+  twoMinors.p1_dob = dateForAge(17)
+  twoMinors.p2_dob = dateForAge(16)
+  const twoMinorsResult = validateNoimSubmission(twoMinors)
+  assert.equal(twoMinorsResult.valid, false)
+  assert.match(twoMinorsResult.errors.p1_dob, /only one party/i)
+  assert.match(twoMinorsResult.errors.p2_dob, /only one party/i)
+})
+
 test('detects age from date of birth and explains both under-18 cases', () => {
   assert.equal(ageOnDate('2008-07-19', new Date('2026-07-19T12:00:00Z')), 18)
   assert.equal(ageOnDate('2008-07-20', new Date('2026-07-19T12:00:00Z')), 17)
 
   const age17 = validSubmission()
-  age17.p1_dob = '2008-07-20'
+  age17.p1_dob = dateForAge(17)
   assert.match(
     generateDocumentChecklist(age17).map((item) => item.document).join('\n'),
     /court approval.*parent\/guardian consent.*only one party may be under 18/i,
   )
 
   const age15 = validSubmission()
-  age15.p1_dob = '2011-07-20'
+  age15.p1_dob = dateForAge(15)
   assert.match(
     generateDocumentChecklist(age15).map((item) => item.document).join('\n'),
     /under 16 cannot marry in Australia/i,
@@ -152,6 +211,9 @@ test('ships a syntactically valid client script with the DOB pattern intact', ()
   const script = getNoimClientScript()
   assert.doesNotThrow(() => new Function(script))
   assert.equal(script.includes('var match = /^(\\d{4})-(\\d{2})-(\\d{2})$/'), true)
+  assert.equal(script.includes("input.setCustomValidity('This service cannot accept a party under 16.')"), true)
+  assert.equal(script.includes("input.addEventListener('change', searchAddress);"), true)
+  assert.equal(script.includes('address-search-button'), false)
 })
 
 test('creates an ASCII-safe attachment filename', () => {

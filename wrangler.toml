@@ -15,5 +15,5 @@ fallthrough = false
 
 [[rules]]
 type = "Text"
-globs = ["**/*.md", "**/*.svg", "**/*.css"]
+globs = ["**/*.md", "**/*.svg", "**/*.css", "**/*.txt"]
 fallthrough = false

@@ -1,5 +1,5 @@
 import { COUNTRIES } from '../shared/countries.ts'
-import { isFieldVisible } from './logic.ts'
+import { ageOnDate, isFieldVisible } from './logic.ts'
 import { noimSteps, type NoimField } from './schema.ts'
 
 export interface NoimValidationResult {
@@ -103,6 +103,28 @@ export function validateNoimSubmission(input: Record<string, unknown>): NoimVali
     }
     if (field.name.endsWith('_dob') && value > new Date().toISOString().slice(0, 10)) {
       errors[field.name] = `${field.label} cannot be in the future`
+    }
+  }
+
+  const ages = ['p1', 'p2'].map((prefix) => {
+    const fieldName = `${prefix}_dob`
+    const value = data[fieldName]
+    return {
+      fieldName,
+      age: value && !errors[fieldName] && isValidDate(value) ? ageOnDate(value) : null,
+    }
+  })
+
+  for (const { fieldName, age } of ages) {
+    if (age !== null && age < 16) {
+      errors[fieldName] = 'This service cannot accept a party under 16. A person under 16 cannot marry in Australia.'
+    }
+  }
+
+  const partiesAged16Or17 = ages.filter(({ age }) => age !== null && age >= 16 && age < 18)
+  if (partiesAged16Or17.length > 1) {
+    for (const { fieldName } of partiesAged16Or17) {
+      errors[fieldName] = 'Only one party may be aged 16 or 17. Contact an authorised celebrant.'
     }
   }
 

@@ -1,6 +1,7 @@
 import type { FC } from 'hono/jsx'
 import { noimSteps, type NoimField, type NoimStep } from './schema'
 import { getNoimClientScript } from './logic'
+import { OCCUPATIONS } from './occupations'
 // Countries list is now embedded in client JS (logic.ts) for the custom dropdown
 
 const NoimFieldComponent: FC<{ field: NoimField }> = ({ field }) => {
@@ -46,7 +47,19 @@ const NoimFieldComponent: FC<{ field: NoimField }> = ({ field }) => {
             />
             <div class="country-dropdown"></div>
           </div>
-        ) : field.type === 'text' || field.type === 'email' || field.type === 'date' ? (
+        ) : field.type === 'date' ? (
+          <>
+            <input
+              type="date"
+              name={field.name}
+              required={field.required}
+              data-was-required={field.required ? 'true' : 'false'}
+            />
+            {field.name.endsWith('_dob') && (
+              <small class="dob-age-note" role="status" aria-live="polite"></small>
+            )}
+          </>
+        ) : field.type === 'text' || field.type === 'email' ? (
           <input
             type={field.type}
             name={field.name}
@@ -54,6 +67,8 @@ const NoimFieldComponent: FC<{ field: NoimField }> = ({ field }) => {
             data-was-required={field.required ? 'true' : 'false'}
             placeholder={field.placeholder || ''}
             maxlength={field.type === 'email' ? 254 : field.type === 'text' ? 160 : undefined}
+            list={field.name.endsWith('_occupation') ? 'occupation-suggestions' : undefined}
+            autocomplete={field.name.endsWith('_occupation') ? 'off' : undefined}
           />
         ) : field.type === 'textarea' ? (
           <textarea
@@ -85,6 +100,7 @@ const NoimFieldComponent: FC<{ field: NoimField }> = ({ field }) => {
                   value={opt.value}
                   required={field.required}
                   data-was-required={field.required ? 'true' : 'false'}
+                  checked={opt.value === field.defaultValue}
                 />
                 {opt.label}
               </label>
@@ -98,15 +114,14 @@ const NoimFieldComponent: FC<{ field: NoimField }> = ({ field }) => {
               class="address-input"
               required={field.required}
               data-was-required={field.required ? 'true' : 'false'}
-              placeholder="Enter the full address, or search OpenStreetMap"
+              placeholder="Start typing your full address"
               autocomplete="off"
               maxlength={300}
             />
-            <button type="button" class="address-search-button secondary">Search OpenStreetMap</button>
             <div class="address-search-status" role="status" aria-live="polite"></div>
             <div class="address-dropdown"></div>
             <small class="address-privacy-note">
-              Manual entry stays in this form. Search terms are sent to the OpenStreetMap Nominatim service only when you press the search button.{' '}
+              After you finish editing this field, the completed address is sent once to OpenStreetMap Nominatim to find suggestions. Nothing is sent on each keystroke.{' '}
               <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap attribution</a>
             </small>
             {/* Hidden fields for structured address components */}
@@ -265,6 +280,9 @@ export const NoimFormPage: FC<{ submitUrl: string }> = ({ submitUrl }) => (
         hgroup h3 { color: var(--text); }
         fieldset { margin: 0; }
         .address-input { width: 100%; }
+        .dob-age-note { display:none;margin-top:0.4rem;padding:0.65rem 0.75rem;border-radius:3px;line-height:1.45; }
+        .dob-age-note.warning { display:block;background:#fff7ed;color:#9a3412;border:1px solid #fed7aa; }
+        .dob-age-note.error { display:block;background:var(--error-bg);color:var(--error-text);border:1px solid var(--error-border); }
         .middle-name-hint { display:none; margin-top:4px; font-size:13px; }
         .address-fallback-note { color:var(--text-muted); font-size:13px; margin-top:4px; }
 
@@ -291,7 +309,6 @@ export const NoimFormPage: FC<{ submitUrl: string }> = ({ submitUrl }) => (
 
         /* Address searchable dropdown */
         .address-select { position: relative; }
-        .address-search-button { width:100%;margin-top:0.5rem;margin-bottom:0.25rem; }
         .address-search-status { min-height:1.25rem;color:var(--text-muted);font-size:13px; }
         .address-privacy-note { display:block;color:var(--text-muted);font-size:12px;margin-top:0.35rem;line-height:1.45; }
         .address-dropdown {
@@ -358,6 +375,9 @@ export const NoimFormPage: FC<{ submitUrl: string }> = ({ submitUrl }) => (
         </header>
 
         <form id="noim-form" method="post" action={submitUrl}>
+          <datalist id="occupation-suggestions">
+            {OCCUPATIONS.map((occupation) => <option value={occupation}></option>)}
+          </datalist>
           {noimSteps.map((step, i) => (
             <NoimStepComponent step={step} index={i} />
           ))}

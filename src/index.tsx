@@ -196,7 +196,7 @@ app.get('/', (c) => {
               <strong>We do not store any of your data.</strong> The information you enter is used only to generate your NOIM PDF in your browser session. Nothing is saved to a database, no data is logged, and no personal information is retained on our servers after your PDF is generated.
             </p>
             <p>
-              No analytics or tracking are used on this site. You may enter an address manually. If you press <strong>Search OpenStreetMap</strong>, only that address query is sent to the OpenStreetMap Nominatim service; the app does not send address keystrokes as you type.
+              No analytics or tracking are used on this site. After you finish editing an address, the completed address is sent once to OpenStreetMap Nominatim to find suggestions. The app does not send address requests on each keystroke.
             </p>
             <p>
               If you have any concerns about providing your information online, you do not need to use this service. You are welcome to contact your marriage celebrant directly and complete the NOIM form in person.

@@ -9,6 +9,7 @@ export interface NoimField {
   options?: { value: string; label: string }[]
   placeholder?: string
   helpText?: string
+  defaultValue?: string
   conditions?: NoimCondition[]
 }
 
@@ -73,6 +74,7 @@ function partyFields(prefix: string, partyLabel: string): NoimField[] {
       label: `Does ${partyLabel}'s legal name include a family name?`,
       type: 'radio',
       required: true,
+      defaultValue: 'yes',
       options: [
         { value: 'yes', label: 'Yes' },
         { value: 'no', label: 'No — this person does not have a family name' },
@@ -126,7 +128,7 @@ function partyFields(prefix: string, partyLabel: string): NoimField[] {
       label: 'Usual place of residence',
       type: 'address',
       required: true,
-      helpText: 'Enter the full usual place of residence manually, or use the optional OpenStreetMap search',
+      helpText: 'OpenStreetMap suggestions are requested once after you finish editing the address; the entered address remains editable',
     },
     // Item 7: Conjugal (marital) status
     {

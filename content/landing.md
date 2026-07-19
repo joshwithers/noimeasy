@@ -21,7 +21,7 @@ This app was built with a **privacy-first approach**. Your personal details are 
 
 - **No data is stored.** Your form responses exist only in memory while the PDF is being generated, then they're gone. There is no database, no server-side storage, no logs of your personal information.
 - **No accounts or sign-ups.** You don't need to create a login or hand over an email address to use the form.
-- **No tracking or analytics.** There are no cookies, analytics or advertising pixels. Address fields can be entered manually. If you press **Search OpenStreetMap**, only that address query is sent to the OpenStreetMap Nominatim service; there is no keystroke autocomplete.
+- **No tracking or analytics.** There are no cookies, analytics or advertising pixels. After you finish editing an address, the completed address is sent once to OpenStreetMap Nominatim to find suggestions. Nothing is sent on each keystroke.
 - **No document uploads.** Your celebrant must be satisfied about your identity and must receive evidence of date and place of birth before the marriage — this app never asks you to upload or photograph those documents.
 - **Secure by default.** The app runs on Cloudflare's global network over HTTPS, so your data is encrypted in transit.
 
@@ -47,7 +47,7 @@ Have the following ready for **both** people getting married:
 
 If either party has been **previously married**, the celebrant will also need evidence that the previous marriage ended before the new marriage can be solemnised. A pending divorce must take effect before the marriage.
 
-The form checks each party's age from their date of birth. If a party is under 18, it explains that a person aged 16 or 17 needs court approval and parent or guardian consent (or a legal dispensation), that only one party may be under 18, and that a person under 16 cannot marry in Australia.
+The form checks each party's age from their date of birth. It does not accept a party under 16. For a party aged 16 or 17, it explains that only one party may be under 18 and that court approval and parent or guardian consent—unless that consent is dispensed with—are required before marrying.
 
 ## Who can witness your NOIM?
 

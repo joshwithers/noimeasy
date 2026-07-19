@@ -17,7 +17,7 @@ Built for marriage celebrants who want to offer their couples an easy, modern wa
 - **[Cloudflare Workers](https://developers.cloudflare.com/workers/)** — serverless runtime
 - **[Hono](https://hono.dev/)** — lightweight web framework
 - **[pdf-lib](https://pdf-lib.js.org/)** — PDF generation (fills in the official NOIM form)
-- **[OpenStreetMap Nominatim](https://nominatim.org/)** — optional, explicit address search (not keystroke autocomplete)
+- **[OpenStreetMap Nominatim](https://nominatim.org/)** — completed-address lookup after editing finishes (not keystroke autocomplete)
 
 ## Prerequisites
 
@@ -78,16 +78,17 @@ This application is designed to store as little data as possible:
 - **No server-side logs** of personal information
 - **No analytics or tracking** on the site
 - **No identity documents** are collected or uploaded
-- **Address search is explicit** — manual address entry remains local to the form; pressing **Search OpenStreetMap** sends that query to the public Nominatim service. No address request is made on each keystroke.
+- **Address lookup uses a completed query** — after address editing finishes, one completed address is sent to the public Nominatim service for suggestions. No request is made on each keystroke.
 
 ## NOIM scope
 
 - The bundled PDF is the official five-page Attorney-General's Department NOIM form.
 - The app fills only items 1–16, which are completed by the parties. It deliberately leaves all celebrant-only, registry-only and prescribed-authority sections blank.
 - The app supports all four official conjugal-status values, including `Divorce pending`.
+- Occupation fields suggest entries from the supplied occupation list while still accepting any custom occupation typed by the user.
 - Legal names are preserved exactly as entered. A family name is required unless the person explicitly states they do not have one; dashes, punctuation-only values and other placeholders are rejected.
 - The generated PDF embeds a Unicode font for Latin, Greek and Cyrillic names. If the PDF engine cannot safely lay out a script, submission stops with guidance to use the Roman-alphabet spelling from supporting evidence or ask the celebrant, rather than emitting broken glyphs.
-- Dates of birth drive an under-18 notice: a party aged 16 or 17 is told about court approval and parent/guardian consent requirements, while a party under 16 is told they cannot marry in Australia.
+- Dates of birth are enforced on both the client and server: a party under 16 is rejected; a party aged 16 or 17 sees the court-approval and parent/guardian-consent requirements; and two parties under 18 are rejected.
 - Parent 1 details must be entered or marked `Unknown` after reasonable inquiry. Parent 2 fields are included only where applicable.
 - From 12 June 2024, a NOIM may be witnessed in person or remotely by audio-visual link, subject to the Attorney-General's Department's location rules. The approved PDF still contains older physical-presence wording, so the site displays the current rule separately rather than altering the official form.
 
@@ -100,8 +101,10 @@ src/
   landing.ts             Markdown-to-HTML converter for landing page
   forms/noim/
     schema.ts            Form field definitions and step structure
-    logic.ts             Client-side JS (validation, conditional fields, explicit address search)
+    logic.ts             Client-side JS (validation, conditional fields, completed-address lookup)
     index.tsx            Form page component (multi-step UI)
+    occupations.ts      Loads occupation suggestions for the form
+    occupations.txt     Occupation suggestions (custom values remain valid)
     pdf-generator.ts     Fills in the official NOIM PDF template
     noim-blank.pdf       Blank official NOIM form (used as PDF template)
   forms/shared/

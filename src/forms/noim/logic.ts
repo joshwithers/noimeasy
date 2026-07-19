@@ -72,7 +72,7 @@ export function generateDocumentChecklist(data: Record<string, string>): Documen
       docs.push({
         document: age < 16
           ? 'A person under 16 cannot marry in Australia — contact an authorised celebrant immediately'
-          : 'Under-18 marriage requirements: court approval and parent/guardian consent (or a legal dispensation) are required; only one party may be under 18',
+          : 'Under-18 marriage requirements: court approval from a judge or magistrate and parent/guardian consent are required unless that consent is dispensed with; only one party may be under 18',
         party: name,
         reason: `The entered date of birth indicates this party is currently ${age}`,
         required: true,
@@ -155,14 +155,16 @@ export function getNoimClientScript(): string {
     var step = steps[currentStep];
     var visibleFields = step.querySelectorAll('input:not([type=hidden]):not([type=radio]), select, textarea');
     var valid = true;
+    var firstInvalid = null;
 
     // Check standard fields
     visibleFields.forEach(function(field) {
       var wrapper = field.closest('.noim-field');
       if (wrapper && wrapper.style.display === 'none') return;
-      if (field.required && !field.value.trim()) {
+      if (!field.checkValidity()) {
         field.setAttribute('aria-invalid', 'true');
         valid = false;
+        if (!firstInvalid) firstInvalid = field;
       } else {
         field.removeAttribute('aria-invalid');
       }
@@ -179,6 +181,7 @@ export function getNoimClientScript(): string {
       var checked = form.querySelector('input[name="' + name + '"]:checked');
       if (!checked) {
         valid = false;
+        if (!firstInvalid) firstInvalid = form.querySelector('input[name="' + name + '"]');
         form.querySelectorAll('input[name="' + name + '"]').forEach(function(r) {
           r.setAttribute('aria-invalid', 'true');
         });
@@ -189,6 +192,9 @@ export function getNoimClientScript(): string {
       }
     });
 
+    if (firstInvalid && typeof firstInvalid.reportValidity === 'function') {
+      firstInvalid.reportValidity();
+    }
     return valid;
   }
 
@@ -226,6 +232,53 @@ export function getNoimClientScript(): string {
       (today.getUTCMonth() + 1 === month && today.getUTCDate() >= day);
     return birthdayHasPassed ? age : age - 1;
   }
+
+  function updateDobNotice(input) {
+    var note = input.parentElement.querySelector('.dob-age-note');
+    if (!note) return;
+    var age = ageFromDob(input.value);
+    input.setCustomValidity('');
+    note.className = 'dob-age-note';
+    note.textContent = '';
+
+    if (age === null) return;
+    if (age < 16) {
+      input.setCustomValidity('This service cannot accept a party under 16.');
+      note.classList.add('error');
+      note.textContent = 'This service cannot accept a party under 16. A person under 16 cannot marry in Australia. Please contact an authorised celebrant.';
+      return;
+    }
+    if (age < 18) {
+      note.classList.add('warning');
+      note.textContent = 'This party is aged 16 or 17. Only one party may be under 18. Before marrying, they need court approval from a judge or magistrate and consent from a parent or guardian, unless that consent is dispensed with. Contact an authorised celebrant before proceeding.';
+    }
+  }
+
+  function updateAllDobNotices() {
+    var dobInputs = Array.from(document.querySelectorAll('input[name$="_dob"]'));
+    dobInputs.forEach(updateDobNotice);
+    var partiesAged16Or17 = dobInputs.filter(function(input) {
+      var age = ageFromDob(input.value);
+      return age !== null && age >= 16 && age < 18;
+    });
+    if (partiesAged16Or17.length > 1) {
+      partiesAged16Or17.forEach(function(input) {
+        var note = input.parentElement.querySelector('.dob-age-note');
+        input.setCustomValidity('Only one party may be aged 16 or 17.');
+        if (note) {
+          note.className = 'dob-age-note error';
+          note.textContent = 'Both parties are under 18. Only one party may be aged 16 or 17. Please contact an authorised celebrant.';
+        }
+      });
+    }
+  }
+
+  document.querySelectorAll('input[name$="_dob"]').forEach(function(input) {
+    input.max = new Date().toISOString().slice(0, 10);
+    input.addEventListener('input', updateAllDobNotices);
+    input.addEventListener('change', updateAllDobNotices);
+  });
+  updateAllDobNotices();
 
   // === Conditional field visibility ===
   function updateConditionalFields() {
@@ -385,7 +438,7 @@ export function getNoimClientScript(): string {
       if (age !== null && age < 16) {
         container.appendChild(createDocItem('The entered date of birth indicates this party is under 16. A person under 16 cannot marry in Australia. Contact an authorised celebrant immediately.'));
       } else if (age !== null && age < 18) {
-        container.appendChild(createDocItem('The entered date of birth indicates this party is under 18. A person aged 16 or 17 needs court approval and parent or guardian consent (or a legal dispensation), and only one party may be under 18. Contact your celebrant before proceeding.'));
+        container.appendChild(createDocItem('The entered date of birth indicates this party is aged 16 or 17. Only one party may be under 18. Before marrying, they need court approval from a judge or magistrate and consent from a parent or guardian, unless that consent is dispensed with. Contact an authorised celebrant before proceeding.'));
       }
 
       // Conjugal status documents
@@ -449,9 +502,9 @@ export function getNoimClientScript(): string {
   }
 
   // === OpenStreetMap address search ===
-  // Nominatim's public policy prohibits autocomplete. Searches happen only after
-  // a deliberate button press, are cached for this page, and are spaced at least
-  // one second apart.
+  // Nominatim's public policy prohibits autocomplete. A single search happens
+  // only after editing is complete (change/Enter), is cached for this page, and
+  // requests are spaced at least one second apart.
   var addressSearchCache = new Map();
   var lastAddressSearchAt = 0;
 
@@ -472,10 +525,9 @@ export function getNoimClientScript(): string {
   document.querySelectorAll('.address-input').forEach(function(input) {
     var wrapper = input.closest('.address-select');
     if (!wrapper) return;
-    var button = wrapper.querySelector('.address-search-button');
     var dropdown = wrapper.querySelector('.address-dropdown');
     var status = wrapper.querySelector('.address-search-status');
-    if (!button || !dropdown || !status) return;
+    if (!dropdown || !status) return;
     var currentResults = [];
 
     function chooseResult(result) {
@@ -514,16 +566,15 @@ export function getNoimClientScript(): string {
       status.textContent = 'Choose an address from the OpenStreetMap results.';
     }
 
-    button.addEventListener('click', function() {
+    function searchAddress() {
       var query = input.value.trim();
-      if (query.length < 3) {
-        status.textContent = 'Enter at least three characters before searching.';
-        input.focus();
+      if (query.length < 6) {
+        dropdown.style.display = 'none';
+        status.textContent = query ? 'Enter a fuller address to see suggestions.' : '';
         return;
       }
 
-      button.disabled = true;
-      status.textContent = 'Searching OpenStreetMap…';
+      status.textContent = 'Checking the completed address…';
       var cacheKey = query.toLowerCase();
       var cached = addressSearchCache.get(cacheKey);
       var request = cached
@@ -552,9 +603,14 @@ export function getNoimClientScript(): string {
         console.warn('[NOIM Easy] OpenStreetMap address search failed:', error);
         dropdown.style.display = 'none';
         status.textContent = 'Address search is temporarily unavailable. Please enter the address manually.';
-      }).finally(function() {
-        button.disabled = false;
       });
+    }
+
+    input.addEventListener('change', searchAddress);
+    input.addEventListener('keydown', function(event) {
+      if (event.key !== 'Enter') return;
+      event.preventDefault();
+      searchAddress();
     });
 
     dropdown.addEventListener('click', function(event) {
