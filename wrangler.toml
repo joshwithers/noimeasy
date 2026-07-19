@@ -1,6 +1,6 @@
 name = "noim-prep"
 main = "src/index.tsx"
-compatibility_date = "2025-02-01"
+compatibility_date = "2026-07-19"
 # Replace with your own Cloudflare account ID (or remove to be prompted on deploy)
 # account_id = ""
 
@@ -8,12 +8,9 @@ routes = [
   { pattern = "noimeasy.au", custom_domain = true }
 ]
 
-[vars]
-EMAIL_FROM = "hello@noimeasy.au"
-
 [[rules]]
 type = "Data"
-globs = ["**/*.pdf", "**/*.png"]
+globs = ["**/*.pdf", "**/*.png", "**/*.ttf"]
 fallthrough = false
 
 [[rules]]

@@ -2,12 +2,8 @@ import { Hono } from 'hono'
 import type { Env } from './types'
 import { NoimFormPage } from './forms/noim/index'
 import { markdownToHtml } from './landing'
-import { generateNoimPdf } from './forms/noim/pdf-generator'
-import {
-  getNoimEmailSubject,
-  renderNoimEmail,
-  renderCoupleConfirmationEmail,
-} from './forms/noim/email-template'
+import { generateNoimPdf, UnsupportedPdfCharacterError } from './forms/noim/pdf-generator'
+import { safePdfFilename, validateNoimSubmission } from './forms/noim/validation'
 import landingMd from '../content/landing.md'
 import logoSvg from '../content/logo.svg'
 import faviconPng from '../content/favicon.png'
@@ -200,7 +196,7 @@ app.get('/', (c) => {
               <strong>We do not store any of your data.</strong> The information you enter is used only to generate your NOIM PDF in your browser session. Nothing is saved to a database, no data is logged, and no personal information is retained on our servers after your PDF is generated.
             </p>
             <p>
-              If you choose to email the PDF to a celebrant or to yourself, that email is sent via a third-party email provider (Resend) and we do not keep a copy. No analytics or tracking are used on this site.
+              No analytics or tracking are used on this site. You may enter an address manually. If you press <strong>Search OpenStreetMap</strong>, only that address query is sent to the OpenStreetMap Nominatim service; the app does not send address keystrokes as you type.
             </p>
             <p>
               If you have any concerns about providing your information online, you do not need to use this service. You are welcome to contact your marriage celebrant directly and complete the NOIM form in person.
@@ -232,7 +228,6 @@ app.get('/prepare', (c) => {
   return c.html(
     '<!DOCTYPE html>' +
     (<NoimFormPage
-      googleMapsApiKey={c.env.GOOGLE_MAPS_API_KEY}
       submitUrl="/submit"
     />).toString()
   )
@@ -241,140 +236,43 @@ app.get('/prepare', (c) => {
 // === Form submission ===
 app.post('/submit', async (c) => {
   const body = await c.req.parseBody()
-  const data: Record<string, string> = {}
-  for (const [key, value] of Object.entries(body)) {
-    data[key] = String(value)
-  }
 
   // Honeypot check
-  if (data['_hp']) {
-    return c.text('Thank you for your submission.', 200)
+  if (typeof body['_hp'] === 'string' && body['_hp'].trim()) {
+    return c.json({ ok: false, error: 'Unable to process this submission.' }, 422)
   }
-  delete data['_hp']
+
+  const validation = validateNoimSubmission(body)
+  if (!validation.valid) {
+    const firstError = Object.values(validation.errors)[0] || 'Please check the form and try again.'
+    return c.json({ ok: false, error: firstError, fields: validation.errors }, 400)
+  }
+  const data = validation.data
 
   // Generate PDF — this is the only thing we do with the data
-  const pdfBytes = await generateNoimPdf(data)
-  const p1Last = data['p1_last_name'] || 'Party1'
-  const p2Last = data['p2_last_name'] || 'Party2'
-  const pdfFilename = `NOIM-${p1Last}-${p2Last}.pdf`
+  let pdfBytes: Uint8Array
+  try {
+    pdfBytes = await generateNoimPdf(data)
+  } catch (error) {
+    if (error instanceof UnsupportedPdfCharacterError) {
+      return c.json({
+        ok: false,
+        error: `The character ${JSON.stringify(error.character)} cannot be rendered safely in the official NOIM PDF. Please use the spelling shown in the Roman-alphabet section of the supporting document, or ask your celebrant for help.`,
+      }, 422)
+    }
+    throw error
+  }
+  const pdfFilename = safePdfFilename(data)
 
   // Return the PDF directly — nothing is stored
   return new Response(pdfBytes, {
     headers: {
       'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename="${pdfFilename}"`,
+      'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff',
     },
   })
 })
-
-app.post('/send-emails', async (c) => {
-  const body = await c.req.parseBody()
-  const data: Record<string, string> = {}
-  for (const [key, value] of Object.entries(body)) {
-    data[key] = String(value)
-  }
-
-  const celebrantEmail = data['celebrant_email']?.trim()
-  const coupleEmail = data['couple_email']?.trim()
-
-  if (!celebrantEmail && !coupleEmail) {
-    return c.json({ ok: false, error: 'No email addresses provided' }, 400)
-  }
-
-  // Generate the PDF again for the attachment
-  const pdfBytes = await generateNoimPdf(data)
-  const p1Last = data['p1_last_name'] || 'Party1'
-  const p2Last = data['p2_last_name'] || 'Party2'
-  const pdfFilename = `NOIM-${p1Last}-${p2Last}.pdf`
-
-  if (!c.env.RESEND_API_KEY) {
-    return c.json({ ok: false, error: 'Email sending is not configured. Please download your PDF and email it manually.' }, 500)
-  }
-
-  try {
-    await sendEmails(c.env, data, pdfBytes, pdfFilename, celebrantEmail, coupleEmail)
-    return c.json({ ok: true })
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
-    console.error('Email send failed:', message)
-    return c.json({ ok: false, error: 'Failed to send emails. Please try again or email the PDF manually.' }, 500)
-  }
-})
-
-// === Email sending ===
-async function sendEmails(
-  env: { RESEND_API_KEY: string; EMAIL_FROM: string },
-  data: Record<string, string>,
-  pdfBytes: Uint8Array,
-  pdfFilename: string,
-  celebrantEmail?: string,
-  coupleEmail?: string,
-) {
-  const from = env.EMAIL_FROM || 'NOIM Easy <noreply@example.com>'
-  const attachments = [{ filename: pdfFilename, content: toBase64(pdfBytes) }]
-
-  // Send to celebrant / third party if provided
-  if (celebrantEmail) {
-    const html = renderNoimEmail(data)
-    await sendViaResend(env.RESEND_API_KEY, {
-      from,
-      to: celebrantEmail,
-      subject: getNoimEmailSubject(data),
-      html,
-      attachments,
-    })
-  }
-
-  // Send copy to the couple if provided
-  if (coupleEmail) {
-    const html = renderCoupleConfirmationEmail(data)
-    await sendViaResend(env.RESEND_API_KEY, {
-      from,
-      to: coupleEmail,
-      subject: 'Your Notice of Intended Marriage is ready',
-      html,
-      attachments,
-    })
-  }
-}
-
-function toBase64(bytes: Uint8Array): string {
-  let binary = ''
-  for (let i = 0; i < bytes.byteLength; i++) {
-    binary += String.fromCharCode(bytes[i])
-  }
-  return btoa(binary)
-}
-
-async function sendViaResend(
-  apiKey: string,
-  email: {
-    from: string
-    to: string | string[]
-    subject: string
-    html: string
-    attachments?: { filename: string; content: string }[]
-  }
-) {
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      from: email.from,
-      to: Array.isArray(email.to) ? email.to : [email.to],
-      subject: email.subject,
-      html: email.html,
-      attachments: email.attachments,
-    }),
-  })
-
-  if (!response.ok) {
-    const err = await response.text()
-    throw new Error(`Resend error: ${response.status} ${err}`)
-  }
-}
 
 export default app

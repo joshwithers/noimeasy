@@ -6,12 +6,12 @@ Getting married in Australia? Every couple must lodge a **Notice of Intended Mar
 
 The NOIM is a legal form required under **Section 42 of the Marriage Act 1961**. It tells the Australian Government that you intend to marry. Filling it out by hand can be fiddly — there are fields for both parties' personal details, parent information, conjugal status, and more.
 
-This app walks you through the form step by step, then generates a **completed PDF** ready to print. You can also email a copy directly to your celebrant if you'd like.
+This app walks you through the form step by step, then generates a **completed PDF** ready to download and print.
 
 Here's what happens after:
 
 1. **Print the PDF** or **prepare it to be on a device like an iPad where you can digitally sign**
-2. **Sign it in front of an authorised witness** (see below)
+2. **Sign it in the presence of an authorised witness** — in person or, where the current location rules allow it, remotely by audio-visual link
 3. **Give the signed NOIM to your celebrant** along with your supporting documents
 4. Your celebrant verifies everything, your **one month notice period begins**, and you're on your way to getting married
 
@@ -21,10 +21,9 @@ This app was built with a **privacy-first approach**. Your personal details are 
 
 - **No data is stored.** Your form responses exist only in memory while the PDF is being generated, then they're gone. There is no database, no server-side storage, no logs of your personal information.
 - **No accounts or sign-ups.** You don't need to create a login or hand over an email address to use the form.
-- **No tracking or analytics.** There are no cookies, no third-party trackers or Google analytics, no advertising pixels. Nobody is watching what you type.
-- **No document uploads.** You'll need to show identity documents to your witness and celebrant in person — this app never asks you to upload or photograph them.
+- **No tracking or analytics.** There are no cookies, analytics or advertising pixels. Address fields can be entered manually. If you press **Search OpenStreetMap**, only that address query is sent to the OpenStreetMap Nominatim service; there is no keystroke autocomplete.
+- **No document uploads.** Your celebrant must be satisfied about your identity and must receive evidence of date and place of birth before the marriage — this app never asks you to upload or photograph those documents.
 - **Secure by default.** The app runs on Cloudflare's global network over HTTPS, so your data is encrypted in transit.
-- **Emailing is optional.** If you choose to email the PDF to your celebrant or yourself, the email is sent and no copy is retained by the app.
 
 In short: your data comes in, your PDF goes out, and nothing is kept.
 
@@ -38,30 +37,33 @@ In short: your data comes in, your PDF goes out, and nothing is kept.
 
 Have the following ready for **both** people getting married:
 
-- **Full legal name** (as it appears on your ID)
+- **Full legal name** exactly as it appears on the supporting birth, change-of-name or marriage document, including every given name. If a person has no family name, select the form's **does not have a family name** option and leave that item blank — do not use a dash or other placeholder.
 - **Date of birth**
 - **Country, city, and state of birth**
 - **Usual occupation**
 - **Current residential address**
-- **Conjugal (marital) status** — never married, divorced, or widowed
+- **Conjugal status** — never validly married, divorced, widowed, or divorce pending
 - **Parent details** — names and countries of birth (for the marriage register)
 
-If either party has been **previously married**, you'll also need:
-- Date the divorce became final, and which court granted it; or
-- Death certificate number and date of death (if widowed)
+If either party has been **previously married**, the celebrant will also need evidence that the previous marriage ended before the new marriage can be solemnised. A pending divorce must take effect before the marriage.
+
+The form checks each party's age from their date of birth. If a party is under 18, it explains that a person aged 16 or 17 needs court approval and parent or guardian consent (or a legal dispensation), that only one party may be under 18, and that a person under 16 cannot marry in Australia.
 
 ## Who can witness your NOIM?
 
-Your NOIM must be signed in front of one of the following:
+Your NOIM must be signed in the presence of an authorised witness. Since 12 June 2024, witnessing may happen in person or remotely by audio-visual link, but the witness categories and location rules still apply.
+
+If you sign in Australia, the witness can be:
 
 - An **authorised marriage celebrant** (including your own celebrant)
 - A **Justice of the Peace (JP)**
 - A **barrister or solicitor**
 - A **medical practitioner**
 - A **member of the Australian Federal Police or state/territory police force**
-- An **Australian Diplomatic Officer** or **Australian Consular Officer** (if signing overseas)
 
-The witness must sight your original identification documents when you sign.
+If you sign outside Australia, the witness can be an **Australian Diplomatic Officer**, **Australian Consular Officer**, **notary public**, or another overseas witness category listed on the official form. An authorised celebrant cannot witness a person who is outside Australia. For remote witnessing, the witness must be in Australia when the signing party is in Australia, or outside Australia when the signing party is outside Australia.
+
+Your celebrant separately confirms what identity and supporting documents they need to sight before the marriage.
 
 ### Can I sign electronically?
 

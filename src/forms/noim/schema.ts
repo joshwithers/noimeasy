@@ -10,7 +10,6 @@ export interface NoimField {
   placeholder?: string
   helpText?: string
   conditions?: NoimCondition[]
-  titleCase?: boolean  // auto-capitalise on blur (e.g. "john smith" → "John Smith")
 }
 
 export interface NoimCondition {
@@ -55,6 +54,7 @@ const CONJUGAL_STATUS_OPTIONS = [
   { value: 'never_married', label: 'Never validly married' },
   { value: 'divorced', label: 'Divorced' },
   { value: 'widowed', label: 'Widowed' },
+  { value: 'divorce_pending', label: 'Divorce pending' },
 ]
 
 function partyFields(prefix: string, partyLabel: string): NoimField[] {
@@ -69,29 +69,39 @@ function partyFields(prefix: string, partyLabel: string): NoimField[] {
     },
     // Item 2: Last name (surname)
     {
+      name: `${prefix}_has_family_name`,
+      label: `Does ${partyLabel}'s legal name include a family name?`,
+      type: 'radio',
+      required: true,
+      options: [
+        { value: 'yes', label: 'Yes' },
+        { value: 'no', label: 'No — this person does not have a family name' },
+      ],
+      helpText: 'Check the birth certificate, change-of-name certificate or other document supporting the legal name',
+    },
+    {
       name: `${prefix}_last_name`,
       label: 'Last name (surname)',
       type: 'text',
       required: true,
-      titleCase: true,
-      helpText: 'As it appears on your identification documents',
+      helpText: 'Enter it exactly as it appears on the document supporting the legal name. Do not enter a dash or placeholder.',
+      conditions: [{ field: `${prefix}_has_family_name`, operator: 'eq', value: 'yes' }],
     },
-    // Item 3: First name
+    // Item 3: Given name(s)
     {
       name: `${prefix}_first_name`,
-      label: 'First name',
+      label: 'First given name',
       type: 'text',
       required: true,
-      titleCase: true,
+      helpText: 'Enter it exactly as it appears on the document supporting the legal name',
     },
-    // Middle name(s)
+    // Additional given name(s)
     {
       name: `${prefix}_middle_names`,
-      label: 'Middle name(s)',
+      label: 'Additional given name(s)',
       type: 'text',
       required: false,
-      titleCase: true,
-      helpText: 'Leave blank if no middle name',
+      helpText: 'Include every given name shown on the document supporting your legal name; leave blank only if none',
     },
     // Item 4: Gender (optional)
     {
@@ -108,7 +118,6 @@ function partyFields(prefix: string, partyLabel: string): NoimField[] {
       label: 'Usual occupation',
       type: 'text',
       required: true,
-      titleCase: true,
       placeholder: 'e.g. Marketing Manager',
     },
     // Item 6: Place of residence
@@ -117,7 +126,7 @@ function partyFields(prefix: string, partyLabel: string): NoimField[] {
       label: 'Usual place of residence',
       type: 'address',
       required: true,
-      helpText: 'Start typing and select from the suggestions',
+      helpText: 'Enter the full usual place of residence manually, or use the optional OpenStreetMap search',
     },
     // Item 7: Conjugal (marital) status
     {
@@ -126,38 +135,6 @@ function partyFields(prefix: string, partyLabel: string): NoimField[] {
       type: 'select',
       required: true,
       options: CONJUGAL_STATUS_OPTIONS,
-    },
-    // Conditional: Divorce details
-    {
-      name: `${prefix}_divorce_date`,
-      label: 'Date divorce became final',
-      type: 'date',
-      required: true,
-      conditions: [{ field: `${prefix}_conjugal_status`, operator: 'eq', value: 'divorced' }],
-    },
-    {
-      name: `${prefix}_divorce_court`,
-      label: 'Court that granted the divorce',
-      type: 'text',
-      required: true,
-      titleCase: true,
-      placeholder: 'e.g. Family Court of Australia, Sydney',
-      conditions: [{ field: `${prefix}_conjugal_status`, operator: 'eq', value: 'divorced' }],
-    },
-    // Conditional: Widowed details
-    {
-      name: `${prefix}_death_certificate_number`,
-      label: 'Death certificate number',
-      type: 'text',
-      required: true,
-      conditions: [{ field: `${prefix}_conjugal_status`, operator: 'eq', value: 'widowed' }],
-    },
-    {
-      name: `${prefix}_spouse_death_date`,
-      label: 'Date of death',
-      type: 'date',
-      required: true,
-      conditions: [{ field: `${prefix}_conjugal_status`, operator: 'eq', value: 'widowed' }],
     },
     // Item 8: Birthplace
     {
@@ -171,7 +148,6 @@ function partyFields(prefix: string, partyLabel: string): NoimField[] {
       label: 'City/town of birth',
       type: 'text',
       required: true,
-      titleCase: true,
     },
     {
       name: `${prefix}_birth_state`,
@@ -198,81 +174,63 @@ function partyFields(prefix: string, partyLabel: string): NoimField[] {
   ]
 }
 
-function singleParentFields(prefix: string, parentPrefix: string, parentLabel: string): NoimField[] {
-  return [
-    // Current name
-    {
-      name: `${prefix}_${parentPrefix}_first_name`,
-      label: `${parentLabel}'s first name`,
-      type: 'text',
-      required: false,
-      titleCase: true,
-      helpText: 'Leave blank if unknown',
-    },
-    {
-      name: `${prefix}_${parentPrefix}_middle_names`,
-      label: `${parentLabel}'s middle name(s)`,
-      type: 'text',
-      required: false,
-      titleCase: true,
-    },
-    {
-      name: `${prefix}_${parentPrefix}_last_name`,
-      label: `${parentLabel}'s last name (surname)`,
-      type: 'text',
-      required: false,
-      titleCase: true,
-    },
-    // Has name changed?
-    {
-      name: `${prefix}_${parentPrefix}_name_changed`,
-      label: "Has this parent's name changed since their birth?",
-      type: 'radio',
-      required: false,
-      options: [
-        { value: 'no', label: 'No' },
-        { value: 'yes', label: 'Yes' },
-      ],
-    },
-    // Birth name (conditional on name_changed=yes)
-    {
-      name: `${prefix}_${parentPrefix}_birth_first_name`,
-      label: `${parentLabel}'s first name at birth`,
-      type: 'text',
-      required: true,
-      titleCase: true,
-      conditions: [{ field: `${prefix}_${parentPrefix}_name_changed`, operator: 'eq', value: 'yes' }],
-    },
-    {
-      name: `${prefix}_${parentPrefix}_birth_middle_names`,
-      label: `${parentLabel}'s middle name(s) at birth`,
-      type: 'text',
-      required: false,
-      titleCase: true,
-      conditions: [{ field: `${prefix}_${parentPrefix}_name_changed`, operator: 'eq', value: 'yes' }],
-    },
-    {
-      name: `${prefix}_${parentPrefix}_birth_last_name`,
-      label: `${parentLabel}'s last name at birth`,
-      type: 'text',
-      required: true,
-      titleCase: true,
-      conditions: [{ field: `${prefix}_${parentPrefix}_name_changed`, operator: 'eq', value: 'yes' }],
-    },
-    // Country of birth
-    {
-      name: `${prefix}_${parentPrefix}_birth_country`,
-      label: `${parentLabel}'s country of birth`,
-      type: 'country',
-      required: false,
-    },
-  ]
-}
-
 function parentFields(prefix: string): NoimField[] {
   return [
-    ...singleParentFields(prefix, 'father', "Father / Parent 1"),
-    ...singleParentFields(prefix, 'mother', "Mother / Parent 2"),
+    {
+      name: `${prefix}_parent1_current_name`,
+      label: "Parent 1's full current name",
+      type: 'text',
+      required: true,
+      helpText: "If it cannot be found after reasonable inquiry, enter 'Unknown'",
+    },
+    {
+      name: `${prefix}_parent1_birth_name`,
+      label: "Parent 1's full birth name",
+      type: 'text',
+      required: true,
+      helpText: "If it cannot be found after reasonable inquiry, enter 'Unknown'",
+    },
+    {
+      name: `${prefix}_parent1_birth_country`,
+      label: "Parent 1's country of birth",
+      type: 'text',
+      required: true,
+      helpText: "If it cannot be found after reasonable inquiry, enter 'Unknown'",
+    },
+    {
+      name: `${prefix}_parent2_applicable`,
+      label: 'Is there a Parent 2 to include on the NOIM?',
+      type: 'radio',
+      required: true,
+      options: [
+        { value: 'yes', label: 'Yes' },
+        { value: 'no', label: 'No / not applicable' },
+      ],
+    },
+    {
+      name: `${prefix}_parent2_current_name`,
+      label: "Parent 2's full current name",
+      type: 'text',
+      required: true,
+      helpText: "If it cannot be found after reasonable inquiry, enter 'Unknown'",
+      conditions: [{ field: `${prefix}_parent2_applicable`, operator: 'eq', value: 'yes' }],
+    },
+    {
+      name: `${prefix}_parent2_birth_name`,
+      label: "Parent 2's full birth name",
+      type: 'text',
+      required: true,
+      helpText: "If it cannot be found after reasonable inquiry, enter 'Unknown'",
+      conditions: [{ field: `${prefix}_parent2_applicable`, operator: 'eq', value: 'yes' }],
+    },
+    {
+      name: `${prefix}_parent2_birth_country`,
+      label: "Parent 2's country of birth",
+      type: 'text',
+      required: true,
+      helpText: "If it cannot be found after reasonable inquiry, enter 'Unknown'",
+      conditions: [{ field: `${prefix}_parent2_applicable`, operator: 'eq', value: 'yes' }],
+    },
   ]
 }
 
@@ -286,7 +244,7 @@ export const noimSteps: NoimStep[] = [
   {
     id: 'party1-parents',
     title: 'Party 1 — Parent Details',
-    description: 'Items 11–16 from the NOIM (optional but helpful for the marriage register)',
+    description: "Items 11–16 from the NOIM. Enter 'Unknown' if Parent 1 information cannot be found after reasonable inquiry; Parent 2 is completed only if applicable.",
     fields: parentFields('p1'),
   },
   {
@@ -298,13 +256,13 @@ export const noimSteps: NoimStep[] = [
   {
     id: 'party2-parents',
     title: 'Party 2 — Parent Details',
-    description: 'Items 11–16 from the NOIM (optional but helpful for the marriage register)',
+    description: "Items 11–16 from the NOIM. Enter 'Unknown' if Parent 1 information cannot be found after reasonable inquiry; Parent 2 is completed only if applicable.",
     fields: parentFields('p2'),
   },
   {
     id: 'relationship',
-    title: 'Relationship & Ceremony Details',
-    description: 'Item 10 and wedding/ceremony information',
+    title: 'Relationship Details',
+    description: 'Item 10 from the NOIM',
     fields: [
       {
         name: 'parties_related',
@@ -324,55 +282,6 @@ export const noimSteps: NoimStep[] = [
         helpText: 'Note: marriage between certain close relatives is prohibited under the Marriage Act',
         conditions: [{ field: 'parties_related', operator: 'eq', value: 'yes' }],
       },
-      // Wedding/ceremony fields
-      {
-        name: 'wedding_location',
-        label: 'Wedding/ceremony location',
-        type: 'address',
-        required: true,
-        helpText: 'Start typing the venue or location name',
-      },
-      {
-        name: 'wedding_date',
-        label: 'Wedding/ceremony date',
-        type: 'date',
-        required: true,
-      },
-      {
-        name: 'is_international',
-        label: 'Is this an international wedding or elopement?',
-        type: 'radio',
-        required: true,
-        options: [
-          { value: 'no', label: 'No' },
-          { value: 'yes', label: 'Yes' },
-        ],
-      },
-      {
-        name: 'international_date',
-        label: 'International ceremony date',
-        type: 'date',
-        required: true,
-        conditions: [{ field: 'is_international', operator: 'eq', value: 'yes' }],
-      },
-      {
-        name: 'has_australian_date',
-        label: 'Have we organised an Australian date for paperwork?',
-        type: 'radio',
-        required: true,
-        options: [
-          { value: 'no', label: 'No' },
-          { value: 'yes', label: 'Yes' },
-        ],
-        conditions: [{ field: 'is_international', operator: 'eq', value: 'yes' }],
-      },
-      {
-        name: 'australian_paperwork_date',
-        label: 'Australian paperwork date',
-        type: 'date',
-        required: true,
-        conditions: [{ field: 'has_australian_date', operator: 'eq', value: 'yes' }],
-      },
     ],
   },
   {
@@ -385,21 +294,6 @@ export const noimSteps: NoimStep[] = [
     id: 'review',
     title: 'Review & Submit',
     description: 'Please review all your details before submitting',
-    fields: [
-      {
-        name: 'celebrant_email',
-        label: 'Send a copy to your celebrant or another person',
-        type: 'email',
-        required: false,
-        helpText: 'Optional — enter an email address to send the completed NOIM PDF to (e.g. your celebrant). We do not keep this address.',
-      },
-      {
-        name: 'couple_email',
-        label: 'Send a copy to yourselves',
-        type: 'email',
-        required: false,
-        helpText: 'Optional — enter your email address to receive a copy of the PDF',
-      },
-    ],
+    fields: [],
   },
 ]

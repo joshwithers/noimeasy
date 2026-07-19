@@ -42,6 +42,7 @@ const NoimFieldComponent: FC<{ field: NoimField }> = ({ field }) => {
               data-was-required={field.required ? 'true' : 'false'}
               placeholder="Start typing a country..."
               autocomplete="off"
+              maxlength={160}
             />
             <div class="country-dropdown"></div>
           </div>
@@ -51,8 +52,8 @@ const NoimFieldComponent: FC<{ field: NoimField }> = ({ field }) => {
             name={field.name}
             required={field.required}
             data-was-required={field.required ? 'true' : 'false'}
-            data-title-case={field.titleCase ? 'true' : undefined}
             placeholder={field.placeholder || ''}
+            maxlength={field.type === 'email' ? 254 : field.type === 'text' ? 160 : undefined}
           />
         ) : field.type === 'textarea' ? (
           <textarea
@@ -61,6 +62,7 @@ const NoimFieldComponent: FC<{ field: NoimField }> = ({ field }) => {
             data-was-required={field.required ? 'true' : 'false'}
             placeholder={field.placeholder || ''}
             rows={3}
+            maxlength={300}
           />
         ) : field.type === 'select' ? (
           <select
@@ -96,10 +98,17 @@ const NoimFieldComponent: FC<{ field: NoimField }> = ({ field }) => {
               class="address-input"
               required={field.required}
               data-was-required={field.required ? 'true' : 'false'}
-              placeholder="Start typing an address..."
+              placeholder="Enter the full address, or search OpenStreetMap"
               autocomplete="off"
+              maxlength={300}
             />
+            <button type="button" class="address-search-button secondary">Search OpenStreetMap</button>
+            <div class="address-search-status" role="status" aria-live="polite"></div>
             <div class="address-dropdown"></div>
+            <small class="address-privacy-note">
+              Manual entry stays in this form. Search terms are sent to the OpenStreetMap Nominatim service only when you press the search button.{' '}
+              <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap attribution</a>
+            </small>
             {/* Hidden fields for structured address components */}
             <input type="hidden" name={`${field.name}_street`} />
             <input type="hidden" name={`${field.name}_suburb`} />
@@ -128,7 +137,7 @@ const NoimStepComponent: FC<{ step: NoimStep; index: number }> = ({ step, index 
       <div>
         {step.fields.map((field) => <NoimFieldComponent field={field} />)}
         <button type="submit" id="submit-btn-top" style="display:none;width:100%;margin-bottom:1.5rem">Generate my NOIM PDF</button>
-        <div id="email-feedback" style="display:none;margin-bottom:1.5rem;padding:12px 16px;border-radius:3px;font-size:0.92rem"></div>
+        <div id="form-feedback" style="display:none;margin-bottom:1.5rem;padding:12px 16px;border-radius:3px;font-size:0.92rem"></div>
         <div id="review-section">
           <p style="color:var(--text-muted)">Navigate to this step to review all your details before submitting.</p>
         </div>
@@ -139,10 +148,7 @@ const NoimStepComponent: FC<{ step: NoimStep; index: number }> = ({ step, index 
   </div>
 )
 
-export const NoimFormPage: FC<{
-  googleMapsApiKey: string
-  submitUrl: string
-}> = ({ googleMapsApiKey, submitUrl }) => (
+export const NoimFormPage: FC<{ submitUrl: string }> = ({ submitUrl }) => (
   <html lang="en">
     <head>
       <meta charset="utf-8" />
@@ -285,6 +291,9 @@ export const NoimFormPage: FC<{
 
         /* Address searchable dropdown */
         .address-select { position: relative; }
+        .address-search-button { width:100%;margin-top:0.5rem;margin-bottom:0.25rem; }
+        .address-search-status { min-height:1.25rem;color:var(--text-muted);font-size:13px; }
+        .address-privacy-note { display:block;color:var(--text-muted);font-size:12px;margin-top:0.35rem;line-height:1.45; }
         .address-dropdown {
           display: none; position: absolute; z-index: 100; width: 100%;
           max-height: 260px; overflow-y: auto;
@@ -294,12 +303,13 @@ export const NoimFormPage: FC<{
           box-shadow: 0 4px 12px var(--dropdown-shadow);
         }
         .address-option {
-          padding: 10px 14px; cursor: pointer; font-size: 14px;
+          display:block;width:100%;margin:0;padding:10px 14px;cursor:pointer;font-size:14px;
+          border:0;border-radius:0;background:transparent;text-align:left;
           border-bottom: 1px solid var(--border-subtle);
           color: var(--text);
         }
         .address-option:last-child { border-bottom: none; }
-        .address-option:hover {
+        .address-option:hover, .address-option:focus {
           background: var(--surface-hover);
         }
         .address-option small { display: block; color: var(--text-muted); font-size: 12px; margin-top: 2px; }
@@ -338,8 +348,12 @@ export const NoimFormPage: FC<{
         <header style="text-align:center;margin-bottom:2rem">
           <h2 style="color:var(--text)">Prepare your NOIM</h2>
           <p style="color:var(--text-muted)">
-            Fill in your details below. When you're done, you'll get a completed NOIM PDF to
-            download, print, and sign with your celebrant and a witness.
+            Fill in your details exactly as they should appear on the official form. When you're done,
+            you'll get a completed NOIM PDF to download and sign in the presence of an authorised witness.
+          </p>
+          <p style="color:var(--text-muted);font-size:0.9rem">
+            Since 12 June 2024, an authorised witness may witness a NOIM in person or remotely by
+            audio-visual link, subject to the location rules explained by the Attorney-General's Department.
           </p>
         </header>
 
@@ -366,7 +380,7 @@ export const NoimFormPage: FC<{
         NOIM Easy is a preparation tool only. It does not constitute legal advice.
       </footer>
 
-      <script dangerouslySetInnerHTML={{ __html: getNoimClientScript(googleMapsApiKey) }} />
+      <script dangerouslySetInnerHTML={{ __html: getNoimClientScript() }} />
     </body>
   </html>
 )

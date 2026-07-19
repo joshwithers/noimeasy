@@ -1,15 +1,14 @@
 # NOIM Easy
 
-A privacy-focused web application for preparing Australia's **Notice of Intended Marriage (NOIM)** form online. Couples fill in their details through a guided multi-step form and receive a completed NOIM PDF ready to print, sign, and give to their celebrant.
+A privacy-focused web application for preparing Australia's **Notice of Intended Marriage (NOIM)** form online. Couples fill in their details through a guided multi-step form and receive a completed official NOIM PDF ready to sign in the presence of an authorised witness and give to their celebrant.
 
 Built for marriage celebrants who want to offer their couples an easy, modern way to prepare the NOIM before their appointment.
 
 ## How it works
 
-1. Couples visit the site and fill in the multi-step form (personal details, parent details, ceremony info)
+1. Couples visit the site and fill in the party-completed NOIM fields (personal details, parent details and relationship)
 2. A completed NOIM PDF is generated server-side using the official form template
 3. The PDF is returned directly as a download — **nothing is stored**
-4. Optionally, the couple can email the PDF to their celebrant or to themselves
 
 **No data is stored.** No database, no KV store, no logs. The form data exists only for the duration of the request, is used to generate the PDF, and is then discarded. No identity documents are collected or uploaded.
 
@@ -18,15 +17,13 @@ Built for marriage celebrants who want to offer their couples an easy, modern wa
 - **[Cloudflare Workers](https://developers.cloudflare.com/workers/)** — serverless runtime
 - **[Hono](https://hono.dev/)** — lightweight web framework
 - **[pdf-lib](https://pdf-lib.js.org/)** — PDF generation (fills in the official NOIM form)
-- **[Resend](https://resend.com/)** — transactional email (optional, only if the user chooses to email the PDF)
-- **Google Maps Places API** — address autocomplete (optional)
+- **[OpenStreetMap Nominatim](https://nominatim.org/)** — optional, explicit address search (not keystroke autocomplete)
 
 ## Prerequisites
 
-- [Node.js](https://nodejs.org/) (v18+)
+- [Node.js](https://nodejs.org/) 24 LTS (the version in `.nvmrc`)
 - A [Cloudflare account](https://dash.cloudflare.com/sign-up) (free tier works)
-- [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/install-and-update/) (`npm install -g wrangler`)
-- A [Resend account](https://resend.com/) with a verified sending domain (optional — only needed if you want to offer the email-to-celebrant feature)
+- Wrangler is installed locally with the project dependencies
 
 ## Setup
 
@@ -40,43 +37,10 @@ npm install
 
 Update (or remove) the `account_id` in `wrangler.toml` to match your own Cloudflare account.
 
-### 2. Set up Resend (optional)
-
-Only needed if you want users to be able to email the PDF to their celebrant or themselves.
-
-1. Create an account at [resend.com](https://resend.com/)
-2. Add and verify your sending domain (e.g. `yourdomain.com`) — Resend will give you DNS records to add
-3. Generate an API key
-
-### 3. Configure environment variables
-
-Create a `.dev.vars` file in the project root for local development:
-
-```
-RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxx
-GOOGLE_MAPS_API_KEY=your-google-maps-api-key
-EMAIL_FROM=NOIM Easy <forms@yourdomain.com>
-```
-
-| Variable | Required | Description |
-|---|---|---|
-| `RESEND_API_KEY` | No | Your Resend API key. Without it, the email-to-celebrant feature won't work but the form and PDF generation will. |
-| `GOOGLE_MAPS_API_KEY` | No | Enables address autocomplete. Requires "Places API (New)" enabled in Google Cloud Console. Without it, address fields are plain text inputs. |
-| `EMAIL_FROM` | No | The sender address for outgoing emails, e.g. `NOIM Easy <forms@yourdomain.com>`. Must match a verified domain in your Resend account. |
-
-For production, set these as secrets via Wrangler:
-
-```sh
-wrangler secret put RESEND_API_KEY
-wrangler secret put GOOGLE_MAPS_API_KEY
-wrangler secret put EMAIL_FROM
-```
-
-### 4. Customise branding (optional)
+### 2. Customise branding (optional)
 
 - **Landing page content**: Edit `content/landing.md`
 - **Logo**: Replace `content/logo.svg` and `content/favicon.png`
-- **Email footer**: Edit `src/forms/noim/email-template.ts` — look for the footer section and replace with your name/business
 - **Site colours**: Defined inline in `src/index.tsx` and `src/forms/noim/index.tsx`
 
 ## Development
@@ -87,6 +51,14 @@ npm run dev
 
 This starts a local dev server at `http://localhost:8787` using Wrangler. The `.dev.vars` file is loaded automatically.
 
+Run the complete local release gate with:
+
+```sh
+npm run check
+```
+
+This runs TypeScript, the NOIM contract tests, and a Wrangler production dry-run.
+
 ## Deploy
 
 ```sh
@@ -95,7 +67,6 @@ npm run deploy
 
 This deploys to Cloudflare Workers. Make sure you've:
 - Set your `account_id` in `wrangler.toml`
-- Set any secrets via `wrangler secret put`
 
 Your app will be live at `https://noim-prep.<your-subdomain>.workers.dev`. You can add a custom domain through the Cloudflare dashboard.
 
@@ -107,21 +78,31 @@ This application is designed to store as little data as possible:
 - **No server-side logs** of personal information
 - **No analytics or tracking** on the site
 - **No identity documents** are collected or uploaded
-- **Emails are optional** — the user chooses whether to send the PDF to anyone. If they do, the email is sent via Resend and no copy is retained by the application
+- **Address search is explicit** — manual address entry remains local to the form; pressing **Search OpenStreetMap** sends that query to the public Nominatim service. No address request is made on each keystroke.
+
+## NOIM scope
+
+- The bundled PDF is the official five-page Attorney-General's Department NOIM form.
+- The app fills only items 1–16, which are completed by the parties. It deliberately leaves all celebrant-only, registry-only and prescribed-authority sections blank.
+- The app supports all four official conjugal-status values, including `Divorce pending`.
+- Legal names are preserved exactly as entered. A family name is required unless the person explicitly states they do not have one; dashes, punctuation-only values and other placeholders are rejected.
+- The generated PDF embeds a Unicode font for Latin, Greek and Cyrillic names. If the PDF engine cannot safely lay out a script, submission stops with guidance to use the Roman-alphabet spelling from supporting evidence or ask the celebrant, rather than emitting broken glyphs.
+- Dates of birth drive an under-18 notice: a party aged 16 or 17 is told about court approval and parent/guardian consent requirements, while a party under 16 is told they cannot marry in Australia.
+- Parent 1 details must be entered or marked `Unknown` after reasonable inquiry. Parent 2 fields are included only where applicable.
+- From 12 June 2024, a NOIM may be witnessed in person or remotely by audio-visual link, subject to the Attorney-General's Department's location rules. The approved PDF still contains older physical-presence wording, so the site displays the current rule separately rather than altering the official form.
 
 ## Project structure
 
 ```
 src/
-  index.tsx              Main app — routes, email sending, landing page
+  index.tsx              Main app — routes and landing page
   types.ts               TypeScript types for env bindings
   landing.ts             Markdown-to-HTML converter for landing page
   forms/noim/
     schema.ts            Form field definitions and step structure
-    logic.ts             Client-side JS (validation, conditional fields, address autocomplete)
+    logic.ts             Client-side JS (validation, conditional fields, explicit address search)
     index.tsx            Form page component (multi-step UI)
     pdf-generator.ts     Fills in the official NOIM PDF template
-    email-template.ts    Email templates
     noim-blank.pdf       Blank official NOIM form (used as PDF template)
   forms/shared/
     countries.ts         Country list for dropdown fields

@@ -1,5 +1,5 @@
-import type { NoimCondition } from './schema'
-import { COUNTRIES } from '../shared/countries'
+import type { NoimCondition } from './schema.ts'
+import { COUNTRIES } from '../shared/countries.ts'
 
 /**
  * Check if a field should be visible given the current form data.
@@ -21,7 +21,7 @@ export function isFieldVisible(
       case 'eq':
         return fieldValue === compareValue
       case 'neq':
-        return fieldValue !== compareValue
+        return fieldValue !== '' && fieldValue !== compareValue
       case 'in':
         return Array.isArray(compareValue) && compareValue.includes(fieldValue)
       default:
@@ -40,6 +40,18 @@ export interface DocumentItem {
   required: boolean
 }
 
+export function ageOnDate(dateOfBirth: string, onDate = new Date()): number | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateOfBirth)
+  if (!match) return null
+
+  const [, year, month, day] = match.map(Number)
+  let age = onDate.getUTCFullYear() - year
+  const birthdayHasPassed = onDate.getUTCMonth() + 1 > month
+    || (onDate.getUTCMonth() + 1 === month && onDate.getUTCDate() >= day)
+  if (!birthdayHasPassed) age -= 1
+  return age
+}
+
 export function generateDocumentChecklist(data: Record<string, string>): DocumentItem[] {
   const docs: DocumentItem[] = []
 
@@ -49,11 +61,23 @@ export function generateDocumentChecklist(data: Record<string, string>): Documen
 
     // Everyone needs identity documents
     docs.push({
-      document: 'Birth certificate (original or certified copy) OR valid passport',
+      document: 'Official birth certificate/extract OR Australian or overseas passport',
       party: name,
       reason: 'Proof of identity and age',
       required: true,
     })
+
+    const age = ageOnDate(data[`${prefix}_dob`] || '')
+    if (age !== null && age < 18) {
+      docs.push({
+        document: age < 16
+          ? 'A person under 16 cannot marry in Australia — contact an authorised celebrant immediately'
+          : 'Under-18 marriage requirements: court approval and parent/guardian consent (or a legal dispensation) are required; only one party may be under 18',
+        party: name,
+        reason: `The entered date of birth indicates this party is currently ${age}`,
+        required: true,
+      })
+    }
 
     // Conjugal status conditional documents
     const status = data[`${prefix}_conjugal_status`]
@@ -74,16 +98,11 @@ export function generateDocumentChecklist(data: Record<string, string>): Documen
       })
     }
 
-    // Name change
-    if (data[`${prefix}_father_name_changed`] === 'yes' || data[`${prefix}_mother_name_changed`] === 'yes') {
-      // This is about parent name changes — informational only
-    }
-
     // Check if birth country is not Australia — may need translation
     const birthCountry = (data[`${prefix}_birth_country`] || '').toLowerCase()
     if (birthCountry && birthCountry !== 'australia') {
       docs.push({
-        document: 'NAATI-accredited translation of any non-English documents',
+        document: 'Accredited translation of any non-English documents (confirm requirements with your celebrant)',
         party: name,
         reason: `Born outside Australia (${data[`${prefix}_birth_country`]}) — any documents not in English require translation`,
         required: true,
@@ -99,17 +118,10 @@ export function generateDocumentChecklist(data: Record<string, string>): Documen
  * This is injected as a <script> tag and handles:
  * - Conditional field visibility
  * - Step navigation
- * - Google Maps address autocomplete
+ * - Explicit OpenStreetMap address search
  * - Client-side validation before step transitions
  */
-export function getNoimClientScript(googleMapsApiKey: string): string {
-  // Only load Google Maps if the API key looks real (not a placeholder)
-  const hasRealApiKey = googleMapsApiKey
-    && !googleMapsApiKey.includes('your-')
-    && !googleMapsApiKey.includes('placeholder')
-    && !googleMapsApiKey.includes('change-me')
-    && googleMapsApiKey.length > 20
-
+export function getNoimClientScript(): string {
   return `
 (function() {
   var form = document.getElementById('noim-form');
@@ -202,6 +214,19 @@ export function getNoimClientScript(googleMapsApiKey: string): string {
     return (el.value || '').trim();
   }
 
+  function ageFromDob(dateOfBirth) {
+    var match = /^(\\d{4})-(\\d{2})-(\\d{2})$/.exec(dateOfBirth);
+    if (!match) return null;
+    var today = new Date();
+    var year = Number(match[1]);
+    var month = Number(match[2]);
+    var day = Number(match[3]);
+    var age = today.getUTCFullYear() - year;
+    var birthdayHasPassed = today.getUTCMonth() + 1 > month ||
+      (today.getUTCMonth() + 1 === month && today.getUTCDate() >= day);
+    return birthdayHasPassed ? age : age - 1;
+  }
+
   // === Conditional field visibility ===
   function updateConditionalFields() {
     document.querySelectorAll('[data-conditions]').forEach(function(el) {
@@ -228,8 +253,8 @@ export function getNoimClientScript(googleMapsApiKey: string): string {
   }
 
   // Listen for changes to trigger condition updates
-  // Skip address and country inputs — no conditions depend on them,
-  // and running updateConditionalFields while Google Maps or the dropdown is active causes freezes
+  // Skip address and country inputs — no conditions depend on them, and
+  // rebuilding conditional fields while a dropdown is active can interrupt input.
   form.addEventListener('change', function(e) {
     var t = e.target;
     if (t && t.classList && (t.classList.contains('address-input') || t.classList.contains('country-search'))) return;
@@ -318,25 +343,6 @@ export function getNoimClientScript(googleMapsApiKey: string): string {
     });
   });
 
-  // === Title case auto-capitalisation ===
-  function toTitleCase(str) {
-    return str.replace(/\\S+/g, function(word) {
-      // If the word already has mixed case (e.g. "McDonald"), leave it alone
-      if (word !== word.toLowerCase() && word !== word.toUpperCase()) return word;
-      // Otherwise capitalise first letter, lowercase the rest
-      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
-    });
-  }
-
-  form.querySelectorAll('[data-title-case="true"]').forEach(function(input) {
-    input.addEventListener('blur', function() {
-      var val = input.value.trim();
-      if (val) {
-        input.value = toTitleCase(val);
-      }
-    });
-  });
-
   // === Document checklist (informational only — no uploads) ===
   function createDocItem(label) {
     var div = document.createElement('div');
@@ -359,7 +365,7 @@ export function getNoimClientScript(googleMapsApiKey: string): string {
 
     var intro = document.createElement('p');
     intro.style.cssText = 'color:var(--text-muted);margin-bottom:1rem';
-    intro.textContent = 'You will need to bring the following original documents when you meet with your celebrant to sign the NOIM.';
+    intro.textContent = 'Before the marriage, give your celebrant the documents below. Ask your celebrant whether they need originals and when they need to sight them.';
     container.appendChild(intro);
 
     ['p1', 'p2'].forEach(function(prefix) {
@@ -372,8 +378,15 @@ export function getNoimClientScript(googleMapsApiKey: string): string {
       container.appendChild(heading);
 
       // Proof of birth + identity
-      container.appendChild(createDocItem('Proof of date and place of birth: birth certificate (original or certified copy) OR valid passport'));
+      container.appendChild(createDocItem('Proof of date and place of birth: official birth certificate or extract, Australian passport, or overseas passport'));
       container.appendChild(createDocItem('Photo ID to prove identity (e.g. passport, driver licence, or government-issued photo ID)'));
+
+      var age = ageFromDob(getFieldValue(prefix + '_dob'));
+      if (age !== null && age < 16) {
+        container.appendChild(createDocItem('The entered date of birth indicates this party is under 16. A person under 16 cannot marry in Australia. Contact an authorised celebrant immediately.'));
+      } else if (age !== null && age < 18) {
+        container.appendChild(createDocItem('The entered date of birth indicates this party is under 18. A person aged 16 or 17 needs court approval and parent or guardian consent (or a legal dispensation), and only one party may be under 18. Contact your celebrant before proceeding.'));
+      }
 
       // Conjugal status documents
       var status = getFieldValue(prefix + '_conjugal_status');
@@ -383,11 +396,14 @@ export function getNoimClientScript(googleMapsApiKey: string): string {
       if (status === 'widowed') {
         container.appendChild(createDocItem('Death certificate of deceased spouse'));
       }
+      if (status === 'divorce_pending') {
+        container.appendChild(createDocItem('Your divorce must take effect before the marriage can be solemnised; give the final divorce evidence to your celebrant'));
+      }
 
       // Translation needed for non-Australian birth
       var country = getFieldValue(prefix + '_birth_country').toLowerCase();
       if (country && country !== 'australia') {
-        container.appendChild(createDocItem('NAATI-accredited translation of any non-English documents'));
+        container.appendChild(createDocItem('Ask your celebrant whether an accredited translation is required for any non-English documents'));
       }
     });
   }
@@ -405,8 +421,8 @@ export function getNoimClientScript(googleMapsApiKey: string): string {
 
     for (var key in formData) {
       if (excludeFields.includes(key) || !formData[key]) continue;
-      // Skip hidden fields (structured address components for address and wedding_location)
-      if (key.match(/_(street|suburb|state|postcode)$/) && (key.includes('address_') || key.includes('wedding_location_'))) continue;
+      // Skip hidden structured address components
+      if (key.match(/_address_(street|suburb|state|postcode)$/)) continue;
       // Skip the send_copy checkbox from the review table (it's rendered separately)
       if (key === 'send_copy') continue;
       // Skip fields whose parent is hidden
@@ -420,142 +436,136 @@ export function getNoimClientScript(googleMapsApiKey: string): string {
       label = label.charAt(0).toUpperCase() + label.slice(1);
       if (key.startsWith('p1_')) label = 'Party 1: ' + label;
       if (key.startsWith('p2_')) label = 'Party 2: ' + label;
-      tr.innerHTML = '<td style="font-weight:600">' + label + '</td><td>' + formData[key] + '</td>';
+      var labelCell = document.createElement('td');
+      labelCell.style.fontWeight = '600';
+      labelCell.textContent = label;
+      var valueCell = document.createElement('td');
+      valueCell.textContent = String(formData[key]);
+      tr.appendChild(labelCell);
+      tr.appendChild(valueCell);
       table.appendChild(tr);
     }
     container.appendChild(table);
   }
 
-  // === Google Maps Address Autocomplete — Places API (New) ===
-  // Uses AutocompleteSuggestion + Place.fetchFields instead of the legacy
-  // Autocomplete widget or AutocompleteService. Custom dropdown, no widget conflicts.
-  function initAddressFields(AutocompleteSuggestion, AutocompleteSessionToken) {
-    if (!AutocompleteSuggestion || !AutocompleteSuggestion.fetchAutocompleteSuggestions) {
-      console.error('[NOIM Easy] AutocompleteSuggestion not available. Ensure "Places API (New)" is enabled in your Google Cloud Console (this is separate from the legacy "Places API").');
-      return;
+  // === OpenStreetMap address search ===
+  // Nominatim's public policy prohibits autocomplete. Searches happen only after
+  // a deliberate button press, are cached for this page, and are spaced at least
+  // one second apart.
+  var addressSearchCache = new Map();
+  var lastAddressSearchAt = 0;
+
+  function waitForAddressRateLimit() {
+    var waitMs = Math.max(0, 1100 - (Date.now() - lastAddressSearchAt));
+    return new Promise(function(resolve) { setTimeout(resolve, waitMs); });
+  }
+
+  function normaliseOsmAddress(address) {
+    return {
+      street: [address.house_number || '', address.road || address.pedestrian || ''].filter(Boolean).join(' '),
+      suburb: address.suburb || address.neighbourhood || address.city_district || address.town || address.city || '',
+      state: address.state || address.region || '',
+      postcode: address.postcode || ''
+    };
+  }
+
+  document.querySelectorAll('.address-input').forEach(function(input) {
+    var wrapper = input.closest('.address-select');
+    if (!wrapper) return;
+    var button = wrapper.querySelector('.address-search-button');
+    var dropdown = wrapper.querySelector('.address-dropdown');
+    var status = wrapper.querySelector('.address-search-status');
+    if (!button || !dropdown || !status) return;
+    var currentResults = [];
+
+    function chooseResult(result) {
+      input.value = result.display_name || input.value;
+      dropdown.style.display = 'none';
+      status.textContent = 'Address selected. You can edit it manually if needed.';
+      var parts = normaliseOsmAddress(result.address || {});
+      var baseName = input.name;
+      var hiddenStreet = form.querySelector('[name="' + baseName + '_street"]');
+      var hiddenSuburb = form.querySelector('[name="' + baseName + '_suburb"]');
+      var hiddenState = form.querySelector('[name="' + baseName + '_state"]');
+      var hiddenPostcode = form.querySelector('[name="' + baseName + '_postcode"]');
+      if (hiddenStreet) hiddenStreet.value = parts.street;
+      if (hiddenSuburb) hiddenSuburb.value = parts.suburb;
+      if (hiddenState) hiddenState.value = parts.state;
+      if (hiddenPostcode) hiddenPostcode.value = parts.postcode;
     }
-    console.info('[NOIM Easy] Google Maps address autocomplete initialised.');
 
-    document.querySelectorAll('.address-input').forEach(function(input) {
-      var wrapper = input.closest('.address-select');
-      if (!wrapper) return;
-      var dropdown = wrapper.querySelector('.address-dropdown');
-      if (!dropdown) return;
-      var debounceTimer = null;
-      var token = new AutocompleteSessionToken();
-      var currentPredictions = {};
-
-      input.addEventListener('input', function() {
-        var query = input.value.trim();
-        if (query.length < 3) {
-          dropdown.style.display = 'none';
-          return;
-        }
-
-        clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(function() {
-          AutocompleteSuggestion.fetchAutocompleteSuggestions({
-            input: query,
-            sessionToken: token,
-            includedRegionCodes: ['au']
-          }).then(function(response) {
-            dropdown.innerHTML = '';
-            currentPredictions = {};
-            if (!response.suggestions || response.suggestions.length === 0) {
-              dropdown.style.display = 'none';
-              return;
-            }
-            response.suggestions.forEach(function(suggestion) {
-              var pred = suggestion.placePrediction;
-              if (!pred) return;
-              var opt = document.createElement('div');
-              opt.className = 'address-option';
-              var main = (pred.mainText && pred.mainText.text) ? pred.mainText.text : (pred.text ? pred.text.text : '');
-              var secondary = (pred.secondaryText && pred.secondaryText.text) ? pred.secondaryText.text : '';
-              var description = pred.text ? pred.text.text : main;
-              opt.innerHTML = '<span>' + main + '</span>' + (secondary ? '<small>' + secondary + '</small>' : '');
-              opt.dataset.placeId = pred.placeId;
-              opt.dataset.description = description;
-              currentPredictions[pred.placeId] = pred;
-              dropdown.appendChild(opt);
-            });
-            var attr = document.createElement('div');
-            attr.className = 'address-powered';
-            attr.textContent = 'Powered by Google';
-            dropdown.appendChild(attr);
-            dropdown.style.display = 'block';
-          }).catch(function(e) {
-            console.warn('[NOIM Easy] Autocomplete request failed:', e);
-            dropdown.style.display = 'none';
-          });
-        }, 300);
-      });
-
-      dropdown.addEventListener('mousedown', function(e) {
-        e.preventDefault();
-        var opt = e.target.closest('.address-option');
-        if (!opt) return;
-
-        input.value = opt.dataset.description;
+    function renderResults(results) {
+      dropdown.innerHTML = '';
+      currentResults = results;
+      if (!results.length) {
         dropdown.style.display = 'none';
+        status.textContent = 'No matching address found. Check the spelling or enter the address manually.';
+        return;
+      }
+      results.forEach(function(result, index) {
+        var option = document.createElement('button');
+        option.type = 'button';
+        option.className = 'address-option';
+        option.dataset.resultIndex = String(index);
+        option.textContent = result.display_name || '';
+        dropdown.appendChild(option);
+      });
+      dropdown.style.display = 'block';
+      status.textContent = 'Choose an address from the OpenStreetMap results.';
+    }
 
-        var pred = currentPredictions[opt.dataset.placeId];
-        if (!pred) return;
+    button.addEventListener('click', function() {
+      var query = input.value.trim();
+      if (query.length < 3) {
+        status.textContent = 'Enter at least three characters before searching.';
+        input.focus();
+        return;
+      }
 
-        var place = pred.toPlace();
-        place.fetchFields({
-          fields: ['formattedAddress', 'addressComponents']
-        }).then(function() {
-          if (place.formattedAddress) {
-            input.value = place.formattedAddress;
-          }
-          if (place.addressComponents) {
-            var components = {};
-            place.addressComponents.forEach(function(c) {
-              c.types.forEach(function(t) { components[t] = c.longText; });
+      button.disabled = true;
+      status.textContent = 'Searching OpenStreetMap…';
+      var cacheKey = query.toLowerCase();
+      var cached = addressSearchCache.get(cacheKey);
+      var request = cached
+        ? Promise.resolve(cached)
+        : waitForAddressRateLimit().then(function() {
+            lastAddressSearchAt = Date.now();
+            var params = new URLSearchParams({
+              q: query,
+              format: 'jsonv2',
+              addressdetails: '1',
+              limit: '5',
+              'accept-language': 'en-AU,en'
             });
-            var baseName = input.name;
-            var hiddenStreet = form.querySelector('[name="' + baseName + '_street"]');
-            var hiddenSuburb = form.querySelector('[name="' + baseName + '_suburb"]');
-            var hiddenState = form.querySelector('[name="' + baseName + '_state"]');
-            var hiddenPostcode = form.querySelector('[name="' + baseName + '_postcode"]');
-            if (hiddenStreet) hiddenStreet.value = ((components.street_number || '') + ' ' + (components.route || '')).trim();
-            if (hiddenSuburb) hiddenSuburb.value = components.locality || '';
-            if (hiddenState) hiddenState.value = components.administrative_area_level_1 || '';
-            if (hiddenPostcode) hiddenPostcode.value = components.postal_code || '';
-          }
-          token = new AutocompleteSessionToken();
-        }).catch(function(e) {
-          console.warn('[NOIM Easy] Place details fetch failed:', e);
-        });
-      });
+            return fetch('https://nominatim.openstreetmap.org/search?' + params.toString(), {
+              headers: { Accept: 'application/json' }
+            }).then(function(response) {
+              if (!response.ok) throw new Error('OpenStreetMap search returned ' + response.status);
+              return response.json();
+            }).then(function(results) {
+              addressSearchCache.set(cacheKey, results);
+              return results;
+            });
+          });
 
-      input.addEventListener('blur', function() {
-        setTimeout(function() { dropdown.style.display = 'none'; }, 200);
+      request.then(renderResults).catch(function(error) {
+        console.warn('[NOIM Easy] OpenStreetMap address search failed:', error);
+        dropdown.style.display = 'none';
+        status.textContent = 'Address search is temporarily unavailable. Please enter the address manually.';
+      }).finally(function() {
+        button.disabled = false;
       });
-
-      var note = input.parentElement.querySelector('.address-fallback-note');
-      if (note) note.remove();
     });
-  }
 
-  // === Dynamic button text based on email fields ===
-  var celebrantEmailField = form.querySelector('[name="celebrant_email"]');
-  var coupleEmailField = form.querySelector('[name="couple_email"]');
-  var emailFeedback = document.getElementById('email-feedback');
+    dropdown.addEventListener('click', function(event) {
+      var option = event.target.closest('.address-option');
+      if (!option) return;
+      var result = currentResults[Number(option.dataset.resultIndex)];
+      if (result) chooseResult(result);
+    });
+  });
 
-  function hasEmails() {
-    return (celebrantEmailField && celebrantEmailField.value.trim()) ||
-           (coupleEmailField && coupleEmailField.value.trim());
-  }
-
-  function updateSubmitButtonText() {
-    var text = hasEmails() ? 'Generate PDF & send emails' : 'Generate my NOIM PDF';
-    submitBtnTop.textContent = text;
-  }
-
-  if (celebrantEmailField) celebrantEmailField.addEventListener('input', updateSubmitButtonText);
-  if (coupleEmailField) coupleEmailField.addEventListener('input', updateSubmitButtonText);
+  var formFeedback = document.getElementById('form-feedback');
 
   // === Form submission via fetch ===
   form.addEventListener('submit', function(e) {
@@ -566,14 +576,27 @@ export function getNoimClientScript(googleMapsApiKey: string): string {
     btn.disabled = true;
     btn.setAttribute('aria-busy', 'true');
     btn.textContent = 'Generating PDF…';
-    emailFeedback.style.display = 'none';
+    formFeedback.style.display = 'none';
 
     fetch(form.action, {
       method: 'POST',
       body: formData,
     })
     .then(function(res) {
-      if (!res.ok) throw new Error('PDF generation failed');
+      if (!res.ok) {
+        return res.text().then(function(text) {
+          var message = '';
+          try {
+            var result = JSON.parse(text);
+            message = result.error || '';
+          } catch (error) {}
+          throw new Error(message || 'PDF generation failed');
+        });
+      }
+      var contentType = res.headers.get('Content-Type') || '';
+      if (!contentType.toLowerCase().startsWith('application/pdf')) {
+        throw new Error('The server returned an unexpected response instead of a PDF. Please try again.');
+      }
       return res.blob().then(function(blob) {
         // Trigger download
         var url = URL.createObjectURL(blob);
@@ -590,101 +613,30 @@ export function getNoimClientScript(googleMapsApiKey: string): string {
       });
     })
     .then(function() {
-      // If emails were provided, send them
-      if (!hasEmails()) {
-        btn.disabled = false;
-        btn.removeAttribute('aria-busy');
-        btn.textContent = originalText;
-        return;
-      }
-      btn.textContent = 'Sending emails…';
-      return fetch('/send-emails', {
-        method: 'POST',
-        body: new FormData(form),
-      })
-      .then(function(res) {
-        return res.text().then(function(text) {
-          try { return JSON.parse(text); }
-          catch(e) { return { ok: false, error: 'Unexpected server response. Please try again.' }; }
-        });
-      })
-      .then(function(result) {
-        btn.disabled = false;
-        btn.removeAttribute('aria-busy');
-        btn.textContent = originalText;
-        if (result.ok) {
-          emailFeedback.style.display = 'block';
-          emailFeedback.style.background = 'var(--success-bg)';
-          emailFeedback.style.color = 'var(--success-text)';
-          emailFeedback.style.border = '1px solid var(--success-border)';
-          emailFeedback.textContent = 'Emails sent successfully.';
-        } else {
-          emailFeedback.style.display = 'block';
-          emailFeedback.style.background = 'var(--error-bg)';
-          emailFeedback.style.color = 'var(--error-text)';
-          emailFeedback.style.border = '1px solid var(--error-border)';
-          emailFeedback.textContent = result.error || 'Failed to send emails. Please try again.';
-        }
-      });
+      btn.disabled = false;
+      btn.removeAttribute('aria-busy');
+      btn.textContent = originalText;
+      formFeedback.style.display = 'block';
+      formFeedback.style.background = 'var(--success-bg)';
+      formFeedback.style.color = 'var(--success-text)';
+      formFeedback.style.border = '1px solid var(--success-border)';
+      formFeedback.textContent = 'Your NOIM PDF has been downloaded. Review it carefully before signing.';
     })
     .catch(function(err) {
       btn.disabled = false;
       btn.removeAttribute('aria-busy');
       btn.textContent = originalText;
-      emailFeedback.style.display = 'block';
-      emailFeedback.style.background = 'var(--error-bg)';
-      emailFeedback.style.color = 'var(--error-text)';
-      emailFeedback.style.border = '1px solid var(--error-border)';
-      emailFeedback.textContent = 'Something went wrong. Please try again.';
+      formFeedback.style.display = 'block';
+      formFeedback.style.background = 'var(--error-bg)';
+      formFeedback.style.color = 'var(--error-text)';
+      formFeedback.style.border = '1px solid var(--error-border)';
+      formFeedback.textContent = err && err.message ? err.message : 'Something went wrong. Please try again.';
       console.error('Submit error:', err);
     });
   });
 
   // Initialize
   showStep(0);
-
-  // Load Google Maps Places API (New) using the Dynamic Library Import bootstrap.
-  // This sets up google.maps.importLibrary() synchronously as a stub, then lazily
-  // loads the actual JS API on first call. Required for AutocompleteSuggestion.
-  // See: https://developers.google.com/maps/documentation/javascript/load-maps-js-api
-  ${hasRealApiKey ? `
-  (function(g){
-    var h,a,k,p="The Google Maps JavaScript API",c="google",l="importLibrary",q="__ib__",m=document,b=window;
-    b=b[c]||(b[c]={});
-    var d=b.maps||(b.maps={}),r=new Set,e=new URLSearchParams;
-    var u=function(){
-      return h||(h=new Promise(function(f,n){
-        a=m.createElement("script");
-        e.set("libraries",Array.from(r)+"");
-        for(k in g) e.set(k.replace(/[A-Z]/g,function(t){return"_"+t[0].toLowerCase()}),g[k]);
-        e.set("callback",c+".maps."+q);
-        a.src="https://maps."+c+"apis.com/maps/api/js?"+e;
-        d[q]=f;
-        a.onerror=function(){h=n(Error(p+" could not load."))};
-        a.nonce=(m.querySelector("script[nonce]")||{}).nonce||"";
-        m.head.append(a);
-      }))
-    };
-    d[l]?console.warn(p+" only loads once."):d[l]=function(f){
-      r.add(f);
-      return u().then(function(){return d[l](f)})
-    };
-  })({key:"${googleMapsApiKey}",v:"weekly"});
-
-  console.info('[NOIM Easy] Google Maps bootstrap loaded, requesting Places library...');
-  google.maps.importLibrary('places').then(function(lib) {
-    console.info('[NOIM Easy] Places library loaded. AutocompleteSuggestion available:', !!lib.AutocompleteSuggestion);
-    if (lib.AutocompleteSuggestion) {
-      initAddressFields(lib.AutocompleteSuggestion, lib.AutocompleteSessionToken);
-    } else {
-      console.error('[NOIM Easy] AutocompleteSuggestion not found. Enable "Places API (New)" (not legacy "Places API") at https://console.cloud.google.com/apis/library');
-    }
-  }).catch(function(e) {
-    console.error('[NOIM Easy] Failed to load Places library:', e);
-  });
-  ` : `
-  console.info('[NOIM Easy] No Google Maps API key configured. Address fields are plain text.');
-  `}
 })();
 `
 }

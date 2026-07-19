@@ -22,3 +22,8 @@ declare module '*.png' {
   const content: ArrayBuffer
   export default content
 }
+
+declare module '*.ttf' {
+  const content: ArrayBuffer
+  export default content
+}
