@@ -396,7 +396,7 @@ app.get('/', (c) => {
 
             <div class="notice-window" aria-live="polite">
               <div class="notice-result">
-                <span class="notice-result-label">Earliest ordinary marriage date</span>
+                <span class="notice-result-label">Earliest marriage date</span>
                 <strong id="earliest-marriage-output">—</strong>
               </div>
               <div class="notice-result">
