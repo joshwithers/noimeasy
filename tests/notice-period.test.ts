@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { calculateNoticeWindow, getNoticePeriodCalculatorScript } from '../src/lib/notice-period.ts'
+import {
+  calculateNoticeWindow,
+  getNoticePeriodCalculatorScript,
+  getNoticePeriodEmbedCopyScript,
+  getNoticePeriodEmbedResizeScript,
+  NOTICE_PERIOD_EMBED_CODE,
+  NOTICE_PERIOD_EMBED_PATH,
+} from '../src/lib/notice-period.ts'
 
 test('uses the corresponding day when the following month contains it', () => {
   assert.deepEqual(calculateNoticeWindow('2026-01-05'), {
@@ -39,4 +46,29 @@ test('ships a syntactically valid calculator script', () => {
   assert.doesNotThrow(() => new Function(script))
   assert.equal(script.includes('has no day'), true)
   assert.equal(script.includes('targetMonth(received, 18)'), true)
+})
+
+test('provides an iframe embed with external, visually neutral attribution links', () => {
+  assert.equal(NOTICE_PERIOD_EMBED_PATH, '/embed/notice-period')
+  assert.match(NOTICE_PERIOD_EMBED_CODE, /src="https:\/\/noimeasy\.au\/embed\/notice-period"/)
+  assert.match(NOTICE_PERIOD_EMBED_CODE, />NOIM Easy<\/a> to help <a/)
+  assert.match(NOTICE_PERIOD_EMBED_CODE, /href="https:\/\/marriedbyjosh\.com\/"/)
+  assert.equal((NOTICE_PERIOD_EMBED_CODE.match(/color: inherit !important/g) || []).length, 2)
+  assert.equal((NOTICE_PERIOD_EMBED_CODE.match(/text-decoration: none !important/g) || []).length, 2)
+  assert.match(NOTICE_PERIOD_EMBED_CODE, /event\.origin !== 'https:\/\/noimeasy\.au'/)
+  assert.match(NOTICE_PERIOD_EMBED_CODE, /noim-easy:resize/)
+})
+
+test('ships a syntactically valid embed copy script', () => {
+  const script = getNoticePeriodEmbedCopyScript()
+  assert.doesNotThrow(() => new Function(script))
+  assert.equal(script.includes('navigator.clipboard.writeText'), true)
+  assert.equal(script.includes("button.textContent = 'Copied'"), true)
+})
+
+test('ships a syntactically valid iframe resize script', () => {
+  const script = getNoticePeriodEmbedResizeScript()
+  assert.doesNotThrow(() => new Function(script))
+  assert.equal(script.includes("type: 'noim-easy:resize'"), true)
+  assert.equal(script.includes('getBoundingClientRect().height'), true)
 })

@@ -38,6 +38,17 @@ The calculator in `src/lib/notice-period.ts` applies the definition of a month i
 
 The date logic is implemented as a dependency-free server helper and mirrored in the browser script. Both paths are covered by tests for corresponding-day, missing-day, invalid-date, and leap-year cases.
 
+### Embedding the calculator
+
+The homepage disclosure labelled **Embed this calculator on your website** provides a ready-to-copy snippet for celebrants and other publishers. The snippet contains:
+
+- a responsive iframe pointing to `https://noimeasy.au/embed/notice-period`, with a small origin-checked resize listener so the frame fits its content;
+- an accessible iframe title and lazy loading;
+- a separate attribution line reading “Provided by NOIM Easy to help celebrants”;
+- visually neutral links from `NOIM Easy` to `noimeasy.au` and from `celebrants` to `marriedbyjosh.com`.
+
+The iframe endpoint contains only the branded calculator and its legal explanation. It does not load analytics or make any external data request. Its response permits framing, disables indexing, restricts its content sources, and opens legislation and branding links outside the frame.
+
 ## Legal and form behaviour
 
 ### Names
@@ -140,6 +151,7 @@ Operators should still understand that Cloudflare and upstream network providers
 | --- | --- | --- |
 | `GET` | `/` | Landing page, legal process explainer, and notice calculator |
 | `GET` | `/prepare` | Multi-step NOIM preparation form |
+| `GET` | `/embed/notice-period` | Standalone branded notice-period calculator for iframe embeds |
 | `POST` | `/submit` | Validate particulars and return the completed PDF |
 | `GET` | `/address-search?q=...` | Same-origin proxy for completed-address Nominatim suggestions |
 | `GET` | `/occupations.txt` | Bundled occupation suggestions |

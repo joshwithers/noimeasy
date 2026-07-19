@@ -5,6 +5,31 @@ export interface NoticeWindow {
   nextMonthHasCorrespondingDay: boolean
 }
 
+export const NOTICE_PERIOD_EMBED_PATH = '/embed/notice-period'
+
+export const NOTICE_PERIOD_EMBED_CODE = `<div style="max-width: 700px; margin: 0 auto;">
+  <iframe
+    src="https://noimeasy.au/embed/notice-period"
+    title="NOIM notice period calculator"
+    loading="lazy"
+    style="display: block; width: 100%; height: 640px; border: 0; border-radius: 14px; background: #fafafa;"
+  ></iframe>
+  <p style="margin: 10px 0 0; color: #595959; font: 13px/1.5 system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; text-align: center;">
+    Provided by <a href="https://noimeasy.au/" target="_blank" rel="noopener noreferrer" style="color: inherit !important; text-decoration: none !important;">NOIM Easy</a> to help <a href="https://marriedbyjosh.com/" target="_blank" rel="noopener noreferrer" style="color: inherit !important; text-decoration: none !important;">celebrants</a>.
+  </p>
+</div>
+<script>
+  (function (script) {
+    var frame = script.previousElementSibling.querySelector('iframe');
+    window.addEventListener('message', function (event) {
+      if (event.origin !== 'https://noimeasy.au' || event.source !== frame.contentWindow) return;
+      if (!event.data || event.data.type !== 'noim-easy:resize') return;
+      var height = Number(event.data.height);
+      if (Number.isFinite(height) && height >= 360 && height <= 900) frame.style.height = Math.ceil(height) + 'px';
+    });
+  })(document.currentScript);
+</script>`
+
 interface DateParts {
   year: number
   monthIndex: number
@@ -161,6 +186,66 @@ export function getNoticePeriodCalculatorScript(): string {
   input.addEventListener('input', updateNoticeWindow);
   input.addEventListener('change', updateNoticeWindow);
   updateNoticeWindow();
+})();
+`
+}
+
+export function getNoticePeriodEmbedCopyScript(): string {
+  return `
+(function() {
+  var button = document.getElementById('copy-notice-embed');
+  var code = document.getElementById('notice-embed-code');
+  var status = document.getElementById('notice-embed-status');
+  if (!button || !code || !status) return;
+
+  function fallbackCopy(value) {
+    var textarea = document.createElement('textarea');
+    textarea.value = value;
+    textarea.setAttribute('readonly', '');
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    var copied = document.execCommand('copy');
+    textarea.remove();
+    if (!copied) throw new Error('Copy command was not accepted');
+  }
+
+  button.addEventListener('click', async function() {
+    var value = code.textContent || '';
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(value);
+      } else {
+        fallbackCopy(value);
+      }
+      button.textContent = 'Copied';
+      status.textContent = 'Embed code copied.';
+      window.setTimeout(function() {
+        button.textContent = 'Copy embed code';
+        status.textContent = '';
+      }, 2000);
+    } catch {
+      status.textContent = 'Select the code and copy it manually.';
+    }
+  });
+})();
+`
+}
+
+export function getNoticePeriodEmbedResizeScript(): string {
+  return `
+(function() {
+  if (window.parent === window) return;
+  function sendHeight() {
+    var height = Math.ceil(document.body.getBoundingClientRect().height);
+    window.parent.postMessage({ type: 'noim-easy:resize', height: height }, '*');
+  }
+  window.addEventListener('load', sendHeight);
+  if ('ResizeObserver' in window) {
+    new ResizeObserver(sendHeight).observe(document.body);
+  }
+  sendHeight();
 })();
 `
 }

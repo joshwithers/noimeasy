@@ -10,7 +10,13 @@ import {
   formRequestRejection,
   parseFormBodyWithLimit,
 } from './lib/form-request'
-import { getNoticePeriodCalculatorScript } from './lib/notice-period'
+import {
+  getNoticePeriodCalculatorScript,
+  getNoticePeriodEmbedCopyScript,
+  getNoticePeriodEmbedResizeScript,
+  NOTICE_PERIOD_EMBED_CODE,
+  NOTICE_PERIOD_EMBED_PATH,
+} from './lib/notice-period'
 import landingMd from '../content/landing.md'
 import logoSvg from '../content/logo.svg'
 import faviconPng from '../content/favicon.png'
@@ -19,6 +25,38 @@ import picoCss from '../content/pico.min.css'
 import occupationsText from './forms/noim/occupations.txt'
 
 const app = new Hono<Env>()
+
+function NoticePeriodCalculator({ embedded = false }: { embedded?: boolean }) {
+  const linkTarget = embedded ? '_blank' : undefined
+  const linkRel = embedded ? 'noopener noreferrer' : undefined
+
+  return <section class="notice-calculator" aria-labelledby="notice-calculator-heading">
+    <h2 id="notice-calculator-heading">When can you get married?</h2>
+    <p>Choose the date your celebrant receives the completed and signed NOIM.</p>
+    <label class="notice-date-label" for="notice-received-date">Date received by celebrant</label>
+    <input type="date" id="notice-received-date" aria-describedby="notice-rule-note" />
+
+    <div class="notice-window" aria-live="polite">
+      <div class="notice-result">
+        <span class="notice-result-label">Earliest marriage date</span>
+        <strong id="earliest-marriage-output">—</strong>
+      </div>
+      <div class="notice-result">
+        <span class="notice-result-label">Notice valid through</span>
+        <strong id="latest-marriage-output">—</strong>
+      </div>
+    </div>
+    <p class="notice-received-summary">Calculated from receipt on <strong id="notice-received-output">—</strong>.</p>
+    <p id="notice-period-explanation"></p>
+    <p class="notice-rule" id="notice-rule-note">
+      This applies the calendar-month rule in section 2G of the
+      {' '}<a href="https://www.legislation.gov.au/Current/C1901A00002" target={linkTarget} rel={linkRel}>Acts Interpretation Act 1901</a>
+      {' '}to the one-to-18-month window in section 42 of the
+      {' '}<a href="https://www.legislation.gov.au/Current/C1961A00012" target={linkTarget} rel={linkRel}>Marriage Act 1961</a>.
+      It assumes no prescribed authority has approved a shorter notice period. Your celebrant must confirm the final dates.
+    </p>
+  </section>
+}
 
 // === Static assets ===
 app.get('/logo.svg', (c) => {
@@ -100,6 +138,86 @@ app.get('/address-search', async (c) => {
       'X-Content-Type-Options': 'nosniff',
     },
   })
+})
+
+// Standalone calculator intended to be embedded on celebrant websites.
+app.get(NOTICE_PERIOD_EMBED_PATH, (c) => {
+  c.header('Content-Security-Policy', "default-src 'none'; img-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors *")
+  c.header('Referrer-Policy', 'no-referrer')
+  c.header('X-Content-Type-Options', 'nosniff')
+  c.header('X-Robots-Tag', 'noindex, nofollow')
+
+  return c.html(
+    '<!DOCTYPE html>' +
+    (<html lang="en">
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>NOIM notice period calculator</title>
+        <meta name="color-scheme" content="light dark" />
+        <link rel="stylesheet" href="/pico.min.css" />
+        <style>{`
+          :root {
+            --bg:#fff;
+            --text:#111;
+            --muted:#595959;
+            --surface:#fafafa;
+            --border:#e0e0e0;
+            --card-shadow:0 0 0 1px rgba(0,0,0,0.07), 0 1px 2px -1px rgba(0,0,0,0.07), 0 4px 12px rgba(0,0,0,0.05);
+          }
+          @media (prefers-color-scheme:dark) {
+            :root {
+              --bg:#181818;
+              --text:#f1f1f1;
+              --muted:#b8b8b8;
+              --surface:#111;
+              --border:#333;
+              --card-shadow:0 0 0 1px rgba(255,255,255,0.1);
+            }
+          }
+          * { box-sizing:border-box; }
+          html { -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; background:var(--surface); }
+          body { min-width:280px; margin:0; background:var(--surface); color:var(--text); }
+          .embed-header { display:flex; align-items:center; min-height:54px; padding:10px 18px; background:#111; }
+          .embed-header a { display:inline-flex; align-items:center; min-height:34px; }
+          .embed-header img { display:block; width:auto; height:25px; }
+          .notice-calculator { margin:0; padding:18px; background:var(--surface); }
+          .notice-calculator h2 { margin:0 0 0.35rem; color:var(--text); font-size:1.25rem; text-wrap:balance; }
+          .notice-calculator > p { color:var(--muted); text-wrap:pretty; }
+          .notice-calculator > p:first-of-type { margin:0; font-size:0.9rem; }
+          .notice-date-label { display:block; margin:0.9rem 0 0.35rem; color:var(--text); font-size:0.88rem; font-weight:650; }
+          #notice-received-date { min-height:44px; margin:0 0 0.8rem; font-variant-numeric:tabular-nums; }
+          .notice-window { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:0.65rem; }
+          .notice-result { min-width:0; padding:0.85rem; border-radius:6px; background:var(--bg); box-shadow:var(--card-shadow); }
+          .notice-result-label { display:block; min-height:2.2em; margin-bottom:0.3rem; color:var(--muted); font-size:0.68rem; font-weight:750; letter-spacing:0.04em; line-height:1.25; text-transform:uppercase; }
+          .notice-result strong { display:block; color:var(--text); font-size:1rem; font-variant-numeric:tabular-nums; line-height:1.3; text-wrap:balance; }
+          .notice-received-summary { margin:0.7rem 0 0; font-size:0.78rem; }
+          .notice-received-summary strong { color:var(--text); font-variant-numeric:tabular-nums; }
+          #notice-period-explanation { min-height:2.5em; margin:0.6rem 0 0; font-size:0.78rem; line-height:1.4; }
+          .notice-rule { margin:0.75rem 0 0; padding-top:0.75rem; border-top:1px solid var(--border); font-size:0.72rem; line-height:1.45; }
+          .notice-rule a { color:inherit; }
+          @media (max-width:360px) {
+            .embed-header { padding-inline:14px; }
+            .notice-calculator { padding:14px; }
+            .notice-result { padding:0.72rem; }
+            .notice-result strong { font-size:0.9rem; }
+          }
+        `}</style>
+      </head>
+      <body>
+        <header class="embed-header">
+          <a href="https://noimeasy.au/" target="_blank" rel="noopener noreferrer" aria-label="Visit NOIM Easy">
+            <img src="/logo.svg" alt="NOIM Easy" width="187" height="32" />
+          </a>
+        </header>
+        <main>
+          <NoticePeriodCalculator embedded />
+        </main>
+        <script dangerouslySetInnerHTML={{ __html: getNoticePeriodCalculatorScript() }} />
+        <script dangerouslySetInnerHTML={{ __html: getNoticePeriodEmbedResizeScript() }} />
+      </body>
+    </html>).toString()
+  )
 })
 
 // === Landing page ===
@@ -265,6 +383,75 @@ app.get('/', (c) => {
           .notice-received-summary strong { color:var(--text); font-variant-numeric:tabular-nums; }
           .notice-rule { margin-top:1rem; padding-top:1rem; border-top:1px solid var(--border); color:var(--text-muted); font-size:0.8rem; line-height:1.5; }
           .notice-rule a { color:inherit; }
+          .embed-disclosure {
+            margin:-2rem 0 3rem;
+            border-radius:12px;
+            background:var(--surface);
+            box-shadow:var(--card-shadow);
+          }
+          .embed-disclosure summary {
+            position:relative;
+            display:flex;
+            align-items:center;
+            min-height:52px;
+            padding:0.85rem 3rem 0.85rem 1.1rem;
+            color:var(--text);
+            cursor:pointer;
+            font-weight:650;
+            list-style:none;
+            text-wrap:balance;
+          }
+          .embed-disclosure summary::-webkit-details-marker { display:none; }
+          .embed-disclosure summary::after {
+            content:"";
+            position:absolute;
+            right:1.25rem;
+            width:9px;
+            height:9px;
+            border-right:2px solid currentColor;
+            border-bottom:2px solid currentColor;
+            transform:translateY(-2px) rotate(45deg);
+            transition-property:transform;
+            transition-duration:160ms;
+            transition-timing-function:ease-out;
+          }
+          .embed-disclosure[open] summary::after { transform:translateY(2px) rotate(225deg); }
+          .embed-disclosure summary:focus-visible { outline:2px solid var(--text); outline-offset:3px; border-radius:8px; }
+          .embed-disclosure-content { padding:1rem 1.1rem 1.1rem; border-top:1px solid var(--border); }
+          .embed-disclosure-content > p { margin:0 0 0.85rem; color:var(--text-muted); font-size:0.88rem; text-wrap:pretty; }
+          .embed-code {
+            max-height:260px;
+            margin:0;
+            padding:1rem;
+            overflow:auto;
+            border-radius:7px;
+            background:#111;
+            box-shadow:0 0 0 1px rgba(255,255,255,0.08) inset;
+            color:#f5f5f5;
+            font-size:0.76rem;
+            line-height:1.55;
+            text-align:left;
+            white-space:pre;
+          }
+          .embed-code code { padding:0; background:transparent; color:inherit; }
+          .embed-copy-row { display:flex; align-items:center; gap:0.8rem; margin-top:0.85rem; }
+          #copy-notice-embed {
+            min-height:44px;
+            margin:0;
+            padding:0.65rem 1rem;
+            border:0;
+            border-radius:5px;
+            background:var(--text);
+            color:var(--bg);
+            font-size:0.85rem;
+            font-weight:700;
+            transition-property:scale,opacity;
+            transition-duration:150ms;
+            transition-timing-function:ease-out;
+          }
+          #copy-notice-embed:hover { opacity:0.84; }
+          #copy-notice-embed:active { scale:0.96; }
+          #notice-embed-status { color:var(--text-muted); font-size:0.82rem; }
           .cta { text-align: center; margin: 2.5rem 0; }
           .cta a {
             display: inline-block;
@@ -333,6 +520,8 @@ app.get('/', (c) => {
             .process-number { width:40px; height:40px; }
             .notice-calculator { padding:1.1rem; border-radius:12px; }
             .notice-window { grid-template-columns:1fr; }
+            .embed-copy-row { align-items:stretch; flex-direction:column; }
+            #copy-notice-embed { width:100%; }
           }
         `}</style>
       </head>
@@ -388,32 +577,19 @@ app.get('/', (c) => {
             </ol>
           </section>
 
-          <section class="notice-calculator" aria-labelledby="notice-calculator-heading">
-            <h2 id="notice-calculator-heading">When can you get married?</h2>
-            <p>Choose the date your celebrant receives the completed and signed NOIM.</p>
-            <label class="notice-date-label" for="notice-received-date">Date received by celebrant</label>
-            <input type="date" id="notice-received-date" aria-describedby="notice-rule-note" />
+          <NoticePeriodCalculator />
 
-            <div class="notice-window" aria-live="polite">
-              <div class="notice-result">
-                <span class="notice-result-label">Earliest marriage date</span>
-                <strong id="earliest-marriage-output">—</strong>
-              </div>
-              <div class="notice-result">
-                <span class="notice-result-label">Notice valid through</span>
-                <strong id="latest-marriage-output">—</strong>
+          <details class="embed-disclosure">
+            <summary>Embed this calculator on your website</summary>
+            <div class="embed-disclosure-content">
+              <p>Copy and paste this code into your website. It includes the calculator and its attribution links.</p>
+              <pre class="embed-code"><code id="notice-embed-code">{NOTICE_PERIOD_EMBED_CODE}</code></pre>
+              <div class="embed-copy-row">
+                <button type="button" id="copy-notice-embed">Copy embed code</button>
+                <span id="notice-embed-status" role="status" aria-live="polite"></span>
               </div>
             </div>
-            <p class="notice-received-summary">Calculated from receipt on <strong id="notice-received-output">—</strong>.</p>
-            <p id="notice-period-explanation"></p>
-            <p class="notice-rule" id="notice-rule-note">
-              This applies the calendar-month rule in section 2G of the
-              {' '}<a href="https://www.legislation.gov.au/Current/C1901A00002">Acts Interpretation Act 1901</a>
-              {' '}to the one-to-18-month window in section 42 of the
-              {' '}<a href="https://www.legislation.gov.au/Current/C1961A00012">Marriage Act 1961</a>.
-              It assumes no prescribed authority has approved a shorter notice period. Your celebrant must confirm the final dates.
-            </p>
-          </section>
+          </details>
 
           <div dangerouslySetInnerHTML={{ __html: afterProcessContent }} />
 
@@ -446,6 +622,7 @@ app.get('/', (c) => {
           </div>
         </footer>
         <script dangerouslySetInnerHTML={{ __html: getNoticePeriodCalculatorScript() }} />
+        <script dangerouslySetInnerHTML={{ __html: getNoticePeriodEmbedCopyScript() }} />
       </body>
     </html>).toString()
   )
