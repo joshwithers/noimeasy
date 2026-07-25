@@ -84,7 +84,8 @@ The iframe endpoint contains only the branded calculator and its legal explanati
 
 ### Residential addresses
 
-- Address fields are ordinary editable text fields. They are not sent to a third-party address-lookup service.
+- Each party supplies street address, optional unit/building details, suburb/locality, city/town, state/territory/province, postcode/ZIP code, and country.
+- The server validates and assembles those parts into the official PDF address field. They are not sent to a third-party address-lookup service.
 
 ### Conjugal status and previous marriages
 

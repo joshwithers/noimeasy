@@ -26,6 +26,62 @@ const NoimFieldComponent: FC<{ field: NoimField }> = ({ field }) => {
     )
   }
 
+  if (field.type === 'address') {
+    return (
+      <div {...wrapperAttrs}>
+        <fieldset class="residential-address">
+          <legend>{field.label}<span style="color:var(--required)"> *</span></legend>
+          <div class="residential-address-grid">
+            <label class="residential-address-wide">
+              Street address<span style="color:var(--required)"> *</span>
+              <input type="text" name={`${field.name}_line1`} required autocomplete="address-line1" maxlength={300} />
+            </label>
+            <label class="residential-address-wide">
+              Apartment, unit, level or building
+              <input type="text" name={`${field.name}_line2`} autocomplete="address-line2" maxlength={160} />
+            </label>
+            <label>
+              Suburb or locality<span style="color:var(--required)"> *</span>
+              <input type="text" name={`${field.name}_suburb`} required autocomplete="address-level2" maxlength={160} />
+            </label>
+            <label>
+              City or town<span style="color:var(--required)"> *</span>
+              <input type="text" name={`${field.name}_city`} required autocomplete="off" maxlength={160} />
+            </label>
+            <label>
+              State, territory or province<span style="color:var(--required)"> *</span>
+              <input type="text" name={`${field.name}_state`} required autocomplete="address-level1" maxlength={160} />
+            </label>
+            <label>
+              Postcode or ZIP code<span style="color:var(--required)"> *</span>
+              <input type="text" name={`${field.name}_postcode`} required autocomplete="postal-code" maxlength={32} />
+            </label>
+            <label class="residential-address-wide">
+              Country<span style="color:var(--required)"> *</span>
+              <div class="country-select">
+                <input
+                  type="text"
+                  name={`${field.name}_country`}
+                  class="country-search"
+                  required
+                  placeholder="Start typing a country..."
+                  autocomplete="off"
+                  maxlength={160}
+                  role="combobox"
+                  aria-autocomplete="list"
+                  aria-expanded="false"
+                  aria-controls={`${field.name}_country-countries`}
+                />
+                <div id={`${field.name}_country-countries`} class="country-dropdown" role="listbox"></div>
+              </div>
+            </label>
+          </div>
+          <small style="color:var(--text-hint)">These details stay in this form and are assembled into your official PDF.</small>
+        </fieldset>
+      </div>
+    )
+  }
+
   return (
     <div {...wrapperAttrs}>
       <label>
@@ -130,16 +186,6 @@ const NoimFieldComponent: FC<{ field: NoimField }> = ({ field }) => {
               </label>
             ))}
           </fieldset>
-        ) : field.type === 'address' ? (
-          <input
-            type="text"
-            name={field.name}
-            required={field.required}
-            data-was-required={field.required ? 'true' : 'false'}
-            placeholder="Enter your full residential address"
-            autocomplete="street-address"
-            maxlength={300}
-          />
         ) : null}
       </label>
       {field.helpText && <small style="color:var(--text-hint)">{field.helpText}</small>}
@@ -301,6 +347,11 @@ export const NoimFormPage: FC<{ submitUrl: string }> = ({ submitUrl }) => (
           width: auto;
         }
         .noim-field { margin-bottom: 1rem; }
+        .residential-address { margin:0; padding:0; border:0; }
+        .residential-address legend { margin-bottom:0.45rem; font-weight:700; }
+        .residential-address-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:0.85rem; }
+        .residential-address-grid label { margin:0; }
+        .residential-address-wide { grid-column:1 / -1; }
         .step-nav { display: flex; justify-content: space-between; align-items: center; margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--border); }
         .step-nav button { min-width: 120px; border-radius: 3px; }
         #step-indicator { color: var(--text-muted); font-size: 14px; letter-spacing: 0.02em; }
@@ -351,6 +402,11 @@ export const NoimFormPage: FC<{ submitUrl: string }> = ({ submitUrl }) => (
           background: var(--surface-hover);
         }
         .country-option[style*="display: none"] + .country-option { border-top: none; }
+
+        @media (max-width: 540px) {
+          .residential-address-grid { grid-template-columns:1fr; }
+          .residential-address-wide { grid-column:auto; }
+        }
 
         /* Document checklist styling */
         #document-checklist .doc-item {

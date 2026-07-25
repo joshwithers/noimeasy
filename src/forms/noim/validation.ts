@@ -12,6 +12,15 @@ const fields = noimSteps.flatMap((step) => step.fields)
 const countrySet = new Set<string>(COUNTRIES)
 const placeholderName = /^(?:n\/?a|none|null|unknown)$/i
 const punctuationOnly = /^[-\u2010-\u2015\u2212_.'\u00b7\u2032/\\]+$/u
+const addressParts = [
+  { key: 'line1', label: 'Street address', required: true, maxLength: 300 },
+  { key: 'line2', label: 'Apartment, unit, level or building', required: false, maxLength: 160 },
+  { key: 'suburb', label: 'Suburb or locality', required: true, maxLength: 160 },
+  { key: 'city', label: 'City or town', required: true, maxLength: 160 },
+  { key: 'state', label: 'State, territory or province', required: true, maxLength: 160 },
+  { key: 'postcode', label: 'Postcode or ZIP code', required: true, maxLength: 32 },
+  { key: 'country', label: 'Country', required: true, maxLength: 160 },
+] as const
 
 function isLegalNameField(name: string): boolean {
   return /_(?:first_name|last_name|middle_names|parent[12]_(?:current|birth)_name)$/.test(name)
@@ -49,6 +58,55 @@ function maxLength(field: NoimField): number {
   return 160
 }
 
+function collectResidentialAddress(
+  field: NoimField,
+  input: Record<string, unknown>,
+  data: Record<string, string>,
+  errors: Record<string, string>,
+) {
+  const parts = Object.fromEntries(addressParts.map((part) => [part.key, ''])) as Record<string, string>
+
+  for (const part of addressParts) {
+    const inputKey = `${field.name}_${part.key}`
+    const rawValue = input[inputKey]
+    if (rawValue === undefined || rawValue === null) {
+      if (part.required) errors[inputKey] = `${part.label} is required`
+      continue
+    }
+    if (typeof rawValue !== 'string') {
+      errors[inputKey] = `${part.label} must be text`
+      continue
+    }
+
+    const value = rawValue.trim()
+    parts[part.key] = value
+    if (part.required && !value) {
+      errors[inputKey] = `${part.label} is required`
+      continue
+    }
+    if (!value) continue
+    if (value.length > part.maxLength) {
+      errors[inputKey] = `${part.label} is too long`
+      continue
+    }
+    if (/[\u0000-\u001f\u007f]/u.test(value)) {
+      errors[inputKey] = `${part.label} contains an unsupported control character`
+      continue
+    }
+    if (part.key === 'country' && !countrySet.has(value)) {
+      errors[inputKey] = 'Country must be selected from the country list'
+    }
+  }
+
+  data[field.name] = [
+    parts.line1,
+    parts.line2,
+    [parts.suburb, parts.city].filter(Boolean).join(', '),
+    [parts.state, parts.postcode].filter(Boolean).join(' '),
+    parts.country,
+  ].filter(Boolean).join('\n')
+}
+
 export function validateNoimSubmission(input: Record<string, unknown>): NoimValidationResult {
   const data: Record<string, string> = {}
   const errors: Record<string, string> = {}
@@ -79,6 +137,10 @@ export function validateNoimSubmission(input: Record<string, unknown>): NoimVali
   }
 
   for (const field of fields) {
+    if (field.type === 'address') collectResidentialAddress(field, input, data, errors)
+  }
+
+  for (const field of fields) {
     const value = data[field.name]
     const visible = isFieldVisible(field.conditions, data)
 
@@ -86,6 +148,7 @@ export function validateNoimSubmission(input: Record<string, unknown>): NoimVali
       data[field.name] = ''
       continue
     }
+    if (field.type === 'address') continue
     if (field.required && !value) {
       errors[field.name] = `${field.label} is required`
       continue

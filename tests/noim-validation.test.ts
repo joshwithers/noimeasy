@@ -30,7 +30,13 @@ function validSubmission(): Record<string, string> {
     p1_middle_names: 'Quinn',
     p1_gender: 'non-binary',
     p1_occupation: 'Engineer',
-    p1_address: '1 Example Street, Melbourne VIC 3000',
+    p1_address_line1: '1 Example Street',
+    p1_address_line2: '',
+    p1_address_suburb: 'Southbank',
+    p1_address_city: 'Melbourne',
+    p1_address_state: 'Victoria',
+    p1_address_postcode: '3006',
+    p1_address_country: 'Australia',
     p1_conjugal_status: 'divorce_pending',
     p1_birth_country: 'Australia',
     p1_birth_city: 'Melbourne',
@@ -48,7 +54,13 @@ function validSubmission(): Record<string, string> {
     p2_middle_names: '',
     p2_gender: '',
     p2_occupation: 'Teacher',
-    p2_address: '2 Example Road, Sydney NSW 2000',
+    p2_address_line1: '2 Example Road',
+    p2_address_line2: '',
+    p2_address_suburb: 'The Rocks',
+    p2_address_city: 'Sydney',
+    p2_address_state: 'New South Wales',
+    p2_address_postcode: '2000',
+    p2_address_country: 'Australia',
     p2_conjugal_status: 'never_married',
     p2_birth_country: 'New Zealand',
     p2_birth_city: 'Auckland',
@@ -72,6 +84,19 @@ test('uses the Australian legal-date timezone for date-only checks', () => {
     calendarDateInTimeZone(new Date('2026-07-24T14:30:00Z'), 'Australia/Melbourne'),
     '2026-07-25',
   )
+})
+
+test('requires a complete residential address and assembles it for the official PDF', () => {
+  const input = validSubmission()
+  const result = validateNoimSubmission(input)
+  assert.equal(result.valid, true, JSON.stringify(result.errors))
+  assert.equal(result.data.p1_address, '1 Example Street\nSouthbank, Melbourne\nVictoria 3006\nAustralia')
+
+  input.p1_address_city = ''
+  input.p2_address_country = 'Atlantis'
+  const invalid = validateNoimSubmission(input)
+  assert.match(invalid.errors.p1_address_city, /required/)
+  assert.match(invalid.errors.p2_address_country, /country list/)
 })
 
 test('accepts every official conjugal status, including divorce pending', () => {
