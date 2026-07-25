@@ -16,7 +16,7 @@ This app was built with a **privacy-first approach**. Your personal details are 
 
 - **No data is stored.** Your form responses exist only in memory while the PDF is being generated, then they're gone. There is no database, no server-side storage, no logs of your personal information.
 - **No accounts or sign-ups.** You don't need to create a login or hand over an email address to use the form.
-- **No tracking or analytics.** There are no cookies, analytics or advertising pixels. After you finish editing an address, the completed address is sent once to OpenStreetMap Nominatim to find suggestions. Nothing is sent on each keystroke.
+- **No tracking or analytics.** There are no cookies, analytics or advertising pixels. Address details stay in the form and are included only when you generate your PDF.
 - **No document uploads.** Your celebrant must be satisfied about your identity and must receive evidence of date and place of birth before the marriage — this app never asks you to upload or photograph those documents.
 - **Secure by default.** The app runs on Cloudflare's global network over HTTPS, so your data is encrypted in transit.
 

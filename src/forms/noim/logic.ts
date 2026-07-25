@@ -145,7 +145,6 @@ export function generateDocumentChecklist(
  * This is injected as a <script> tag and handles:
  * - Conditional field visibility
  * - Step navigation
- * - Completed-address OpenStreetMap lookup
  * - Client-side validation before step transitions
  */
 export function getNoimClientScript(): string {
@@ -309,8 +308,19 @@ export function getNoimClientScript(): string {
     }
   }
 
+  function calendarDateInTimeZone(date, timeZone) {
+    var parts = new Intl.DateTimeFormat('en-AU', {
+      timeZone: timeZone, year: 'numeric', month: '2-digit', day: '2-digit'
+    }).formatToParts(date);
+    function part(type) {
+      var value = parts.find(function(item) { return item.type === type; });
+      return value ? value.value : '';
+    }
+    return part('year') + '-' + part('month') + '-' + part('day');
+  }
+
   document.querySelectorAll('input[name$="_dob"]').forEach(function(input) {
-    input.max = new Date().toISOString().slice(0, 10);
+    input.max = calendarDateInTimeZone(new Date(), 'Australia/Melbourne');
     input.addEventListener('input', updateAllDobNotices);
     input.addEventListener('change', updateAllDobNotices);
   });
@@ -351,20 +361,18 @@ export function getNoimClientScript(): string {
     });
   }
 
-  // Listen for changes to trigger condition updates
-  // Skip address and country inputs — no conditions depend on them, and
-  // rebuilding conditional fields while a dropdown is active can interrupt input.
+  // Listen for changes to trigger condition updates. No conditions depend on country inputs.
   form.addEventListener('change', function(e) {
     var t = e.target;
-    if (t && t.classList && (t.classList.contains('address-input') || t.classList.contains('country-search'))) return;
+    if (t && t.classList && t.classList.contains('country-search')) return;
     updateConditionalFields();
   });
 
-  // Debounce input events and skip address/country fields
+  // Debounce input events and skip country fields.
   var inputTimer = null;
   form.addEventListener('input', function(e) {
     var t = e.target;
-    if (t && t.classList && (t.classList.contains('address-input') || t.classList.contains('country-search'))) return;
+    if (t && t.classList && t.classList.contains('country-search')) return;
     clearTimeout(inputTimer);
     inputTimer = setTimeout(updateConditionalFields, 150);
   });
@@ -733,131 +741,6 @@ export function getNoimClientScript(): string {
     }
     container.appendChild(table);
   }
-
-  // === OpenStreetMap address search ===
-  // Nominatim's public policy prohibits autocomplete. A single search happens
-  // only after editing is complete (change/Enter), is cached for this page, and
-  // requests are spaced at least one second apart.
-  var addressSearchCache = new Map();
-  var lastAddressSearchAt = 0;
-
-  function waitForAddressRateLimit() {
-    var waitMs = Math.max(0, 1100 - (Date.now() - lastAddressSearchAt));
-    return new Promise(function(resolve) { setTimeout(resolve, waitMs); });
-  }
-
-  function normaliseOsmAddress(address) {
-    return {
-      street: [address.house_number || '', address.road || address.pedestrian || ''].filter(Boolean).join(' '),
-      suburb: address.suburb || address.neighbourhood || address.city_district || address.town || address.city || '',
-      state: address.state || address.region || '',
-      postcode: address.postcode || ''
-    };
-  }
-
-  document.querySelectorAll('.address-input').forEach(function(input) {
-    var wrapper = input.closest('.address-select');
-    if (!wrapper) return;
-    var dropdown = wrapper.querySelector('.address-dropdown');
-    var status = wrapper.querySelector('.address-search-status');
-    if (!dropdown || !status) return;
-    var currentResults = [];
-
-    function resultLabel(result) {
-      return result.formatted_name || result.display_name || '';
-    }
-
-    function chooseResult(result) {
-      input.value = resultLabel(result) || input.value;
-      dropdown.style.display = 'none';
-      status.textContent = 'Address selected.';
-      var parts = normaliseOsmAddress(result.address || {});
-      var baseName = input.name;
-      var hiddenStreet = form.querySelector('[name="' + baseName + '_street"]');
-      var hiddenSuburb = form.querySelector('[name="' + baseName + '_suburb"]');
-      var hiddenState = form.querySelector('[name="' + baseName + '_state"]');
-      var hiddenPostcode = form.querySelector('[name="' + baseName + '_postcode"]');
-      if (hiddenStreet) hiddenStreet.value = parts.street;
-      if (hiddenSuburb) hiddenSuburb.value = parts.suburb;
-      if (hiddenState) hiddenState.value = parts.state;
-      if (hiddenPostcode) hiddenPostcode.value = parts.postcode;
-    }
-
-    function renderResults(results) {
-      dropdown.innerHTML = '';
-      currentResults = results;
-      if (!results.length) {
-        dropdown.style.display = 'none';
-        status.textContent = 'No matching address found. Check the spelling or enter the address manually.';
-        return;
-      }
-      results.forEach(function(result, index) {
-        var option = document.createElement('button');
-        option.type = 'button';
-        option.className = 'address-option';
-        option.dataset.resultIndex = String(index);
-        option.textContent = resultLabel(result);
-        dropdown.appendChild(option);
-      });
-      dropdown.style.display = 'block';
-      status.textContent = 'Choose an address from the OpenStreetMap results.';
-    }
-
-    function searchAddress() {
-      var query = input.value.trim();
-      if (query.length < 6) {
-        dropdown.style.display = 'none';
-        status.textContent = query ? 'Enter a fuller address to see suggestions.' : '';
-        return;
-      }
-
-      status.textContent = 'Checking the completed address…';
-      var cacheKey = query.toLowerCase();
-      var cached = addressSearchCache.get(cacheKey);
-      var request = cached
-        ? Promise.resolve(cached)
-        : waitForAddressRateLimit().then(function() {
-            lastAddressSearchAt = Date.now();
-            return fetch('/address-search?' + new URLSearchParams({ q: query }).toString(), {
-              headers: { Accept: 'application/json' }
-            }).then(function(response) {
-              if (!response.ok) throw new Error('OpenStreetMap search returned ' + response.status);
-              return response.json();
-            }).then(function(results) {
-              addressSearchCache.set(cacheKey, results);
-              return results;
-            });
-          });
-
-      request.then(renderResults).catch(function(error) {
-        console.warn('[NOIM Easy] OpenStreetMap address search failed:', error);
-        dropdown.style.display = 'none';
-        status.textContent = 'Address search is temporarily unavailable. Please enter the address manually.';
-      });
-    }
-
-    input.addEventListener('input', function() {
-      dropdown.style.display = 'none';
-      currentResults = [];
-      var length = input.value.trim().length;
-      status.textContent = length >= 6
-        ? 'Finish editing to load suggestions automatically, or press Enter now.'
-        : '';
-    });
-    input.addEventListener('blur', searchAddress);
-    input.addEventListener('keydown', function(event) {
-      if (event.key !== 'Enter') return;
-      event.preventDefault();
-      searchAddress();
-    });
-
-    dropdown.addEventListener('click', function(event) {
-      var option = event.target.closest('.address-option');
-      if (!option) return;
-      var result = currentResults[Number(option.dataset.resultIndex)];
-      if (result) chooseResult(result);
-    });
-  });
 
   var formFeedback = document.getElementById('form-feedback');
 

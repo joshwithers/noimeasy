@@ -131,29 +131,15 @@ const NoimFieldComponent: FC<{ field: NoimField }> = ({ field }) => {
             ))}
           </fieldset>
         ) : field.type === 'address' ? (
-          <div class="address-select">
-            <input
-              type="text"
-              name={field.name}
-              class="address-input"
-              required={field.required}
-              data-was-required={field.required ? 'true' : 'false'}
-              placeholder="Start typing your full address"
-              autocomplete="off"
-              maxlength={300}
-            />
-            <div class="address-search-status" role="status" aria-live="polite"></div>
-            <div class="address-dropdown"></div>
-            <small class="address-privacy-note">
-              Enter your full address, then choose a suggestion. You can also enter it manually. Suggestions by{' '}
-              <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a>.
-            </small>
-            {/* Hidden fields for structured address components */}
-            <input type="hidden" name={`${field.name}_street`} />
-            <input type="hidden" name={`${field.name}_suburb`} />
-            <input type="hidden" name={`${field.name}_state`} />
-            <input type="hidden" name={`${field.name}_postcode`} />
-          </div>
+          <input
+            type="text"
+            name={field.name}
+            required={field.required}
+            data-was-required={field.required ? 'true' : 'false'}
+            placeholder="Enter your full residential address"
+            autocomplete="street-address"
+            maxlength={300}
+          />
         ) : null}
       </label>
       {field.helpText && <small style="color:var(--text-hint)">{field.helpText}</small>}
@@ -321,7 +307,6 @@ export const NoimFormPage: FC<{ submitUrl: string }> = ({ submitUrl }) => (
         hgroup { margin-bottom: 1.5rem; }
         hgroup h3 { color: var(--text); }
         fieldset { margin: 0; }
-        .address-input { width: 100%; }
         .dob-age-note { display:none;margin-top:0.4rem;padding:0.65rem 0.75rem;border-radius:3px;line-height:1.45; }
         .dob-age-note.warning { display:block;background:#fff7ed;color:#9a3412;border:1px solid #fed7aa; }
         .dob-age-note.error { display:block;background:var(--error-bg);color:var(--error-text);border:1px solid var(--error-border); }
@@ -366,31 +351,6 @@ export const NoimFormPage: FC<{ submitUrl: string }> = ({ submitUrl }) => (
           background: var(--surface-hover);
         }
         .country-option[style*="display: none"] + .country-option { border-top: none; }
-
-        /* Address searchable dropdown */
-        .address-select { position: relative; }
-        .address-search-status { min-height:1.25rem;color:var(--text-muted);font-size:13px; }
-        .address-privacy-note { display:block;color:var(--text-muted);font-size:12px;margin-top:0.35rem;line-height:1.45; }
-        .address-dropdown {
-          display: none; position: absolute; z-index: 100; width: 100%;
-          max-height: 260px; overflow-y: auto;
-          background: var(--bg);
-          border: 1px solid var(--border-input);
-          border-top: none; border-radius: 0 0 3px 3px;
-          box-shadow: 0 4px 12px var(--dropdown-shadow);
-        }
-        .address-option {
-          display:block;width:100%;margin:0;padding:10px 14px;cursor:pointer;font-size:14px;
-          border:0;border-radius:0;background:transparent;text-align:left;
-          border-bottom: 1px solid var(--border-subtle);
-          color: var(--text);
-        }
-        .address-option:last-child { border-bottom: none; }
-        .address-option:hover, .address-option:focus {
-          background: var(--surface-hover);
-        }
-        .address-option small { display: block; color: var(--text-muted); font-size: 12px; margin-top: 2px; }
-        .address-powered { padding: 6px 14px; font-size: 11px; color: var(--powered-text); text-align: right; }
 
         /* Document checklist styling */
         #document-checklist .doc-item {

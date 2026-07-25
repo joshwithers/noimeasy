@@ -4,7 +4,6 @@ import { NoimFormPage } from './forms/noim/index'
 import { markdownToHtml } from './landing'
 import { generateNoimPdf, PdfFieldOverflowError, UnsupportedPdfCharacterError } from './forms/noim/pdf-generator'
 import { safePdfFilename, validateNoimSubmission } from './forms/noim/validation'
-import { addressSearchQuery, formatNominatimResults } from './forms/noim/address'
 import {
   FormBodyTooLargeError,
   formRequestRejection,
@@ -88,53 +87,6 @@ app.get('/occupations.txt', () => {
     headers: {
       'Content-Type': 'text/plain; charset=utf-8',
       'Cache-Control': 'public, max-age=86400',
-      'X-Content-Type-Options': 'nosniff',
-    },
-  })
-})
-
-// Same-origin proxy for the completed-address lookup. Keeping this request on
-// noimeasy.au avoids browser CORS/privacy-extension failures while preserving
-// Nominatim's required attribution and completed-query-only usage.
-app.get('/address-search', async (c) => {
-  const query = (c.req.query('q') || '').trim()
-  if (query.length < 6 || query.length > 300) {
-    return c.json({ error: 'Enter a fuller address before requesting suggestions.' }, 400)
-  }
-
-  const upstreamUrl = new URL('https://nominatim.openstreetmap.org/search')
-  upstreamUrl.searchParams.set('q', addressSearchQuery(query))
-  upstreamUrl.searchParams.set('format', 'jsonv2')
-  upstreamUrl.searchParams.set('addressdetails', '1')
-  upstreamUrl.searchParams.set('limit', '5')
-  upstreamUrl.searchParams.set('accept-language', 'en-AU,en')
-
-  let upstream: Response
-  try {
-    upstream = await fetch(upstreamUrl, {
-      headers: {
-        Accept: 'application/json',
-        Referer: 'https://noimeasy.au/',
-        'User-Agent': 'NOIMEasy/1.0 (+https://noimeasy.au/)',
-      },
-    })
-  } catch {
-    return c.json({ error: 'Address suggestions are temporarily unavailable.' }, 503)
-  }
-
-  if (!upstream.ok) {
-    return c.json({ error: 'Address suggestions are temporarily unavailable.' }, 503)
-  }
-
-  const results = await upstream.json<unknown>()
-  if (!Array.isArray(results)) {
-    return c.json({ error: 'Address suggestions returned an unexpected response.' }, 502)
-  }
-
-  return new Response(JSON.stringify(formatNominatimResults(results, query)), {
-    headers: {
-      'Content-Type': 'application/json; charset=utf-8',
-      'Cache-Control': 'private, no-store',
       'X-Content-Type-Options': 'nosniff',
     },
   })
@@ -599,7 +551,7 @@ app.get('/', (c) => {
               <strong>We do not store any of your data.</strong> The information you enter is used only to generate your NOIM PDF in your browser session. Nothing is saved to a database, no data is logged, and no personal information is retained on our servers after your PDF is generated.
             </p>
             <p>
-              No analytics or tracking are used on this site. After you finish editing an address, the completed address is sent once to OpenStreetMap Nominatim to find suggestions. The app does not send address requests on each keystroke.
+              No analytics or tracking are used on this site. Address details stay in the form and are included only when you choose to generate the PDF.
             </p>
             <p>
               If you have any concerns about providing your information online, you do not need to use this service. You are welcome to contact your marriage celebrant directly and complete the NOIM form in person.

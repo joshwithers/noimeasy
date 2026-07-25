@@ -84,12 +84,7 @@ The iframe endpoint contains only the branded calculator and its legal explanati
 
 ### Residential addresses
 
-- Address fields remain ordinary editable text fields.
-- After editing is completed, the browser can request suggestions through the same-origin `/address-search` endpoint.
-- The Worker sends one completed query to OpenStreetMap Nominatim; it does not send a request on every keystroke.
-- Australian results are reformatted into Australian postal order, including unit information where available.
-- Overseas results retain an appropriate international order.
-- The original user-entered address remains editable and is preserved when no suggestion is selected.
+- Address fields are ordinary editable text fields. They are not sent to a third-party address-lookup service.
 
 ### Conjugal status and previous marriages
 
@@ -128,7 +123,6 @@ The application intentionally has no database, KV namespace, object store, user 
 - The generated PDF is returned directly and is not retained by the application.
 - Identity documents are never uploaded.
 - PDF responses use `Cache-Control: no-store`.
-- Address lookup is the one exception to wholly local form editing: the completed address query is proxied through the Worker to the public Nominatim service so suggestions can be returned. The UI discloses this before use.
 
 Operators should still understand that Cloudflare and upstream network providers process ordinary connection metadata as part of serving requests. The application-level privacy promises above do not redefine those providers' independent infrastructure policies.
 
@@ -153,7 +147,6 @@ Operators should still understand that Cloudflare and upstream network providers
 | `GET` | `/prepare` | Multi-step NOIM preparation form |
 | `GET` | `/embed/notice-period` | Standalone branded notice-period calculator for iframe embeds |
 | `POST` | `/submit` | Validate particulars and return the completed PDF |
-| `GET` | `/address-search?q=...` | Same-origin proxy for completed-address Nominatim suggestions |
 | `GET` | `/occupations.txt` | Bundled occupation suggestions |
 | `GET` | `/logo.svg`, `/favicon.png`, `/og-image.png`, `/pico.min.css` | Self-hosted static assets |
 
@@ -162,7 +155,6 @@ Operators should still understand that Cloudflare and upstream network providers
 - [Cloudflare Workers](https://developers.cloudflare.com/workers/) for the runtime, custom domain, and edge rate limiter
 - [Hono](https://hono.dev/) for routing and HTML responses
 - [pdf-lib](https://pdf-lib.js.org/) and `@pdf-lib/fontkit` for official-form filling and Unicode font embedding
-- [OpenStreetMap Nominatim](https://nominatim.org/) for optional completed-address suggestions
 - TypeScript for server, validation, PDF, and browser-script source
 - Node's built-in test runner for contract and regression tests
 
@@ -274,7 +266,6 @@ src/
       schema.ts                 Party-completed form fields and conditional structure
       logic.ts                  Browser validation, review, age guidance, and suggestions
       validation.ts             Authoritative server-side validation
-      address.ts                Nominatim query preparation and result formatting
       occupations.txt           Suggested occupations; custom values remain allowed
       pdf-generator.ts          Production PDF asset adapter
       pdf-generator-core.ts     PDF mapping, measurement, fonts, and fill logic

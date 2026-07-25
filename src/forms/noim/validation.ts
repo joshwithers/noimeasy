@@ -32,7 +32,7 @@ export function isValidDate(value: string): boolean {
     && date.getUTCDate() === day
 }
 
-function calendarDateInTimeZone(date: Date, timeZone: string): string {
+export function calendarDateInTimeZone(date: Date, timeZone: string): string {
   const parts = new Intl.DateTimeFormat('en-AU', {
     timeZone,
     year: 'numeric',
@@ -123,7 +123,7 @@ export function validateNoimSubmission(input: Record<string, unknown>): NoimVali
       errors[field.name] = `${field.label} must be a valid date`
       continue
     }
-    if (field.name.endsWith('_dob') && value > new Date().toISOString().slice(0, 10)) {
+    if (field.name.endsWith('_dob') && value > calendarDateInTimeZone(new Date(), 'Australia/Melbourne')) {
       errors[field.name] = `${field.label} cannot be in the future`
     }
   }

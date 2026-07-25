@@ -3,8 +3,7 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { noimSteps } from '../src/forms/noim/schema.ts'
 import { ageOnDate, generateDocumentChecklist, getNoimClientScript } from '../src/forms/noim/logic.ts'
-import { addressSearchQuery, formatAustralianAddress, formatNominatimResults } from '../src/forms/noim/address.ts'
-import { safePdfFilename, validateNoimSubmission } from '../src/forms/noim/validation.ts'
+import { calendarDateInTimeZone, safePdfFilename, validateNoimSubmission } from '../src/forms/noim/validation.ts'
 
 function isoDate(date: Date): string {
   return date.toISOString().slice(0, 10)
@@ -68,53 +67,10 @@ function validSubmission(): Record<string, string> {
   }
 }
 
-const georgeStreetResult = {
-  display_name: 'AGL Energy Limited, 200, George Street, Quay Quarter, Sydney, Sydney CBD, Sydney, New South Wales, 2000, Australia',
-  address: {
-    office: 'AGL Energy Limited',
-    house_number: '200',
-    road: 'George Street',
-    neighbourhood: 'Quay Quarter',
-    suburb: 'Sydney',
-    city: 'Sydney',
-    state: 'New South Wales',
-    'ISO3166-2-lvl4': 'AU-NSW',
-    postcode: '2000',
-    country: 'Australia',
-    country_code: 'au',
-  },
-}
-
-test('formats API addresses in Australian postal order', () => {
-  assert.equal(formatAustralianAddress(georgeStreetResult), '200 George Street, SYDNEY NSW 2000')
+test('uses the Australian legal-date timezone for date-only checks', () => {
   assert.equal(
-    formatAustralianAddress(georgeStreetResult, 'Unit 5, 200 George Street Sydney'),
-    'Unit 5, 200 George Street, SYDNEY NSW 2000',
-  )
-  assert.equal(
-    formatAustralianAddress(georgeStreetResult, '5/200 George Street Sydney'),
-    '5/200 George Street, SYDNEY NSW 2000',
-  )
-})
-
-test('searches without an Australian unit prefix while preserving it for display', () => {
-  assert.equal(addressSearchQuery('Unit 5, 200 George Street Sydney'), '200 George Street Sydney')
-  assert.equal(addressSearchQuery('5/200 George Street Sydney'), '200 George Street Sydney')
-  assert.equal(addressSearchQuery('200 George Street Sydney'), '200 George Street Sydney')
-})
-
-test('keeps overseas formatting and deduplicates Australian API results', () => {
-  const overseas = {
-    display_name: '10, Downing Street, Westminster, London, Greater London, England, SW1A 2AA, United Kingdom',
-    address: { country: 'United Kingdom', country_code: 'gb' },
-  }
-  assert.equal(formatAustralianAddress(overseas), overseas.display_name)
-  assert.deepEqual(
-    formatNominatimResults(
-      [georgeStreetResult, { ...georgeStreetResult, display_name: `EY Centre, ${georgeStreetResult.display_name}` }],
-      '200 George Street Sydney',
-    ).map((result) => result.formatted_name),
-    ['200 George Street, SYDNEY NSW 2000'],
+    calendarDateInTimeZone(new Date('2026-07-24T14:30:00Z'), 'Australia/Melbourne'),
+    '2026-07-25',
   )
 })
 
@@ -309,15 +265,10 @@ test('ships a syntactically valid client script with the DOB pattern intact', ()
   assert.doesNotThrow(() => new Function(script))
   assert.equal(script.includes('var match = /^(\\d{4})-(\\d{2})-(\\d{2})$/'), true)
   assert.equal(script.includes("input.setCustomValidity('This service cannot accept a party under 16.')"), true)
-  assert.equal(script.includes("input.addEventListener('blur', searchAddress);"), true)
-  assert.equal(script.includes('address-search-button'), false)
-  assert.equal(script.includes("fetch('/address-search?'"), true)
-  assert.equal(script.includes("fetch('https://nominatim.openstreetmap.org"), false)
   assert.equal(script.includes("fetch('/occupations.txt')"), true)
   assert.equal(script.includes("option.className = 'occupation-option'"), true)
-  assert.equal(script.includes('Finish editing to load suggestions automatically'), true)
-  assert.equal(script.includes("status.textContent = 'Address selected.'"), true)
-  assert.equal(script.includes('You can edit it manually if needed'), false)
+  assert.equal(script.includes('address-search'), false)
+  assert.equal(script.includes("calendarDateInTimeZone(new Date(), 'Australia/Melbourne')"), true)
   assert.equal(script.includes('proposedMarriageDateInput'), true)
   assert.equal(script.includes("event.key === 'ArrowDown'"), true)
   assert.equal(script.includes("event.key === 'Enter'"), true)
