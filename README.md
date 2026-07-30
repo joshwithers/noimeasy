@@ -40,12 +40,13 @@ The date logic is implemented as a dependency-free server helper and mirrored in
 
 ### Embedding the calculator
 
-The homepage disclosure labelled **Embed this calculator on your website** provides a ready-to-copy snippet for celebrants and other publishers. The snippet contains:
+The homepage disclosure labelled **Embed this calculator on your website** provides a ready-to-copy snippet for celebrants, venues and other publishers. The snippet contains:
 
 - a responsive iframe pointing to `https://noimeasy.au/embed/notice-period`, with a small origin-checked resize listener so the frame fits its content;
 - an accessible iframe title and lazy loading;
-- a separate attribution line reading “Provided by NOIM Easy to help celebrants”;
-- visually neutral links from `NOIM Easy` to `noimeasy.au` and from `celebrants` to `marriedbyjosh.com`.
+- an optional, small and visually neutral attribution link to `noimeasy.au`.
+
+Paste the iframe and resize script into a page or HTML block. The calculator works without the attribution; it never requires an account, a lead form or contact details. It is a timing aid only—it does not prepare, receive or lodge a couple’s NOIM.
 
 The iframe endpoint contains only the branded calculator and its legal explanation. It does not load analytics or make any external data request. Its response permits framing, disables indexing, restricts its content sources, and opens legislation and branding links outside the frame.
 
@@ -100,7 +101,7 @@ The review page displays the official labels rather than internal storage codes.
 
 ### Witnessing
 
-The site reflects the current section 42 witness categories and explains remote witnessing. In Australia, the listed witnesses include an authorised celebrant, a Commissioner for Declarations under the *Statutory Declarations Act 1959*, a Justice of the Peace, a barrister or solicitor, a medical practitioner, and an Australian Federal Police or state/territory police member. The site separately lists the permitted overseas categories and location rule.
+The site reflects the current section 42 witness categories and explains remote witnessing. In Australia, the listed witnesses include an authorised celebrant, a Commissioner for Declarations under the _Statutory Declarations Act 1959_, a Justice of the Peace, a barrister or solicitor, a medical practitioner, and an Australian Federal Police or state/territory police member. The site separately lists the permitted overseas categories and location rule.
 
 The bundled official PDF contains older physical-presence wording. The application leaves the official template unchanged and displays the current rule separately.
 
@@ -142,14 +143,14 @@ Operators should still understand that Cloudflare and upstream network providers
 
 ## Routes
 
-| Method | Path | Purpose |
-| --- | --- | --- |
-| `GET` | `/` | Landing page, legal process explainer, and notice calculator |
-| `GET` | `/prepare` | Multi-step NOIM preparation form |
-| `GET` | `/embed/notice-period` | Standalone branded notice-period calculator for iframe embeds |
-| `POST` | `/submit` | Validate particulars and return the completed PDF |
-| `GET` | `/occupations.txt` | Bundled occupation suggestions |
-| `GET` | `/logo.svg`, `/favicon.png`, `/og-image.png`, `/pico.min.css` | Self-hosted static assets |
+| Method | Path                                                          | Purpose                                                       |
+| ------ | ------------------------------------------------------------- | ------------------------------------------------------------- |
+| `GET`  | `/`                                                           | Landing page, legal process explainer, and notice calculator  |
+| `GET`  | `/prepare`                                                    | Multi-step NOIM preparation form                              |
+| `GET`  | `/embed/notice-period`                                        | Standalone branded notice-period calculator for iframe embeds |
+| `POST` | `/submit`                                                     | Validate particulars and return the completed PDF             |
+| `GET`  | `/occupations.txt`                                            | Bundled occupation suggestions                                |
+| `GET`  | `/logo.svg`, `/favicon.png`, `/og-image.png`, `/pico.min.css` | Self-hosted static assets                                     |
 
 ## Technology
 

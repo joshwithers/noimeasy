@@ -1,13 +1,20 @@
-import { noimSteps, type NoimCondition } from './schema.ts'
-import { COUNTRIES } from '../shared/countries.ts'
+import { noimSteps, type NoimCondition } from "./schema.ts";
+import { COUNTRIES } from "../shared/countries.ts";
 
 const reviewMetadata = Object.fromEntries(
-  noimSteps.flatMap((step) => step.fields).map((field) => [field.name, {
-    label: field.label,
-    type: field.type,
-    options: Object.fromEntries(field.options?.map((option) => [option.value, option.label]) || []),
-  }]),
-)
+  noimSteps
+    .flatMap((step) => step.fields)
+    .map((field) => [
+      field.name,
+      {
+        label: field.label,
+        type: field.type,
+        options: Object.fromEntries(
+          field.options?.map((option) => [option.value, option.label]) || [],
+        ),
+      },
+    ]),
+);
 
 /**
  * Check if a field should be visible given the current form data.
@@ -15,129 +22,141 @@ const reviewMetadata = Object.fromEntries(
  */
 export function isFieldVisible(
   conditions: NoimCondition[] | undefined,
-  data: Record<string, string>
+  data: Record<string, string>,
 ): boolean {
-  if (!conditions || conditions.length === 0) return true
+  if (!conditions || conditions.length === 0) return true;
 
   return conditions.every((cond) => {
-    const fieldValue = (data[cond.field] || '').toLowerCase().trim()
-    const compareValue = typeof cond.value === 'string'
-      ? cond.value.toLowerCase().trim()
-      : cond.value.map((v) => v.toLowerCase().trim())
+    const fieldValue = (data[cond.field] || "").toLowerCase().trim();
+    const compareValue =
+      typeof cond.value === "string"
+        ? cond.value.toLowerCase().trim()
+        : cond.value.map((v) => v.toLowerCase().trim());
 
     switch (cond.operator) {
-      case 'eq':
-        return fieldValue === compareValue
-      case 'neq':
-        return fieldValue !== '' && fieldValue !== compareValue
-      case 'in':
-        return Array.isArray(compareValue) && compareValue.includes(fieldValue)
+      case "eq":
+        return fieldValue === compareValue;
+      case "neq":
+        return fieldValue !== "" && fieldValue !== compareValue;
+      case "in":
+        return Array.isArray(compareValue) && compareValue.includes(fieldValue);
       default:
-        return true
+        return true;
     }
-  })
+  });
 }
 
 /**
  * Generate a document checklist based on the form data.
  */
 export interface DocumentItem {
-  document: string
-  party: string
-  reason: string
-  required: boolean
+  document: string;
+  party: string;
+  reason: string;
+  required: boolean;
 }
 
-export function ageOnDate(dateOfBirth: string, onDate = new Date()): number | null {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateOfBirth)
-  if (!match) return null
+export function ageOnDate(
+  dateOfBirth: string,
+  onDate = new Date(),
+): number | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateOfBirth);
+  if (!match) return null;
 
-  const [, year, month, day] = match.map(Number)
-  let age = onDate.getUTCFullYear() - year
-  const birthdayHasPassed = onDate.getUTCMonth() + 1 > month
-    || (onDate.getUTCMonth() + 1 === month && onDate.getUTCDate() >= day)
-  if (!birthdayHasPassed) age -= 1
-  return age
+  const [, year, month, day] = match.map(Number);
+  let age = onDate.getUTCFullYear() - year;
+  const birthdayHasPassed =
+    onDate.getUTCMonth() + 1 > month ||
+    (onDate.getUTCMonth() + 1 === month && onDate.getUTCDate() >= day);
+  if (!birthdayHasPassed) age -= 1;
+  return age;
 }
 
 export function generateDocumentChecklist(
   data: Record<string, string>,
   proposedMarriageDate = data.proposed_marriage_date,
 ): DocumentItem[] {
-  const docs: DocumentItem[] = []
-  const assessmentDate = /^\d{4}-\d{2}-\d{2}$/.test(proposedMarriageDate || '')
+  const docs: DocumentItem[] = [];
+  const assessmentDate = /^\d{4}-\d{2}-\d{2}$/.test(proposedMarriageDate || "")
     ? new Date(`${proposedMarriageDate}T12:00:00Z`)
-    : new Date()
+    : new Date();
 
-  for (const prefix of ['p1', 'p2']) {
-    const partyLabel = prefix === 'p1' ? 'Party 1' : 'Party 2'
-    const name = `${data[`${prefix}_first_name`] || ''} ${data[`${prefix}_last_name`] || ''}`.trim() || partyLabel
+  for (const prefix of ["p1", "p2"]) {
+    const partyLabel = prefix === "p1" ? "Party 1" : "Party 2";
+    const name =
+      `${data[`${prefix}_first_name`] || ""} ${data[`${prefix}_last_name`] || ""}`.trim() ||
+      partyLabel;
 
     // Everyone needs identity documents
     docs.push({
-      document: 'Official birth certificate/extract OR Australian or overseas passport',
+      document:
+        "Official birth certificate/extract OR Australian or overseas passport",
       party: name,
-      reason: 'Proof of identity and age',
+      reason: "Proof of identity and age",
       required: true,
-    })
+    });
 
-    const age = ageOnDate(data[`${prefix}_dob`] || '', assessmentDate)
+    const age = ageOnDate(data[`${prefix}_dob`] || "", assessmentDate);
     if (age !== null && age < 18) {
       docs.push({
-        document: age < 16
-          ? 'A person under 16 cannot marry in Australia — contact an authorised celebrant immediately'
-          : 'Under-18 marriage requirements: court approval from a judge or magistrate and parent/guardian consent are required unless that consent is dispensed with; only one party may be under 18',
+        document:
+          age < 16
+            ? "A person under 16 cannot marry in Australia — contact an authorised celebrant immediately"
+            : "Under-18 marriage requirements: court approval from a judge or magistrate and parent/guardian consent are required unless that consent is dispensed with; only one party may be under 18",
         party: name,
         reason: `The entered date of birth indicates this party will be ${age} on the proposed marriage date`,
         required: true,
-      })
+      });
     }
 
     // Conjugal status conditional documents
-    const status = data[`${prefix}_conjugal_status`]
-    if (status === 'divorced') {
+    const status = data[`${prefix}_conjugal_status`];
+    if (status === "divorced") {
       docs.push({
-        document: 'Divorce certificate (not the application or hearing documents)',
+        document:
+          "Divorce certificate (not the application or hearing documents)",
         party: name,
-        reason: 'Proof of dissolution of previous marriage',
+        reason: "Proof of dissolution of previous marriage",
         required: true,
-      })
+      });
     }
-    if (status === 'widowed') {
+    if (status === "widowed") {
       docs.push({
-        document: 'Death certificate of deceased spouse',
+        document: "Death certificate of deceased spouse",
         party: name,
-        reason: 'Proof of termination of previous marriage',
+        reason: "Proof of termination of previous marriage",
         required: true,
-      })
+      });
     }
 
     // Unknown birthplace particulars require the statutory-declaration pathway.
-    const birthCountry = (data[`${prefix}_birth_country`] || '').toLowerCase()
+    const birthCountry = (data[`${prefix}_birth_country`] || "").toLowerCase();
     const birthplaceUnknown = [
       data[`${prefix}_birth_country`],
       data[`${prefix}_birth_city`],
       data[`${prefix}_birth_state`],
       data[`${prefix}_birth_state_international`],
-    ].some((value) => (value || '').trim().toLowerCase() === 'unknown')
+    ].some((value) => (value || "").trim().toLowerCase() === "unknown");
     if (birthplaceUnknown) {
       docs.push({
-        document: 'Statutory declaration explaining that birthplace particulars could not be ascertained after reasonable inquiry',
+        document:
+          "Statutory declaration explaining that birthplace particulars could not be ascertained after reasonable inquiry",
         party: name,
-        reason: 'Birthplace particulars were entered as unknown',
+        reason: "Birthplace particulars were entered as unknown",
         required: true,
-      })
-    } else if (birthCountry && birthCountry !== 'australia') {
+      });
+    } else if (birthCountry && birthCountry !== "australia") {
       docs.push({
-        document: 'Accredited translation of any non-English documents (confirm requirements with your celebrant)',
+        document:
+          "Accredited translation of any non-English documents (confirm requirements with your celebrant)",
         party: name,
         reason: `Born outside Australia (${data[`${prefix}_birth_country`]}) — any documents not in English require translation`,
         required: true,
-      })
+      });
     }
   }
 
-  return docs
+  return docs;
 }
 
 /**
@@ -157,11 +176,16 @@ export function getNoimClientScript(): string {
   var submitBtn = document.getElementById('submit-btn');
   var submitBtnTop = document.getElementById('submit-btn-top');
   var stepIndicator = document.getElementById('step-indicator');
+  var completionNextSteps = document.getElementById('completion-next-steps');
   var proposedMarriageDateInput = form.querySelector('[name="proposed_marriage_date"]');
   var currentStep = 0;
-  var COUNTRIES = ${JSON.stringify(['Unknown', ...COUNTRIES])};
+  var COUNTRIES = ${JSON.stringify(["Unknown", ...COUNTRIES])};
   var REVIEW_METADATA = ${JSON.stringify({
-    proposed_marriage_date: { label: 'Proposed marriage date', type: 'date', options: {} },
+    proposed_marriage_date: {
+      label: "Proposed marriage date",
+      type: "date",
+      options: {},
+    },
     ...reviewMetadata,
   })};
 
@@ -797,7 +821,8 @@ export function getNoimClientScript(): string {
       formFeedback.style.background = 'var(--success-bg)';
       formFeedback.style.color = 'var(--success-text)';
       formFeedback.style.border = '1px solid var(--success-border)';
-      formFeedback.textContent = 'Your NOIM PDF has been downloaded. Review it carefully before signing.';
+      formFeedback.textContent = 'Your prepared NOIM PDF has been downloaded. It is not legal notice yet: check it, sign under an authorised witness’s observation, then give it to your celebrant.';
+      if (completionNextSteps) completionNextSteps.hidden = false;
     })
     .catch(function(err) {
       btn.disabled = false;
@@ -815,5 +840,5 @@ export function getNoimClientScript(): string {
   // Initialize
   showStep(0);
 })();
-`
+`;
 }

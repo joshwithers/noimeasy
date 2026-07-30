@@ -1,11 +1,11 @@
 export interface NoticeWindow {
-  received: string
-  earliestMarriage: string
-  latestMarriage: string
-  nextMonthHasCorrespondingDay: boolean
+  received: string;
+  earliestMarriage: string;
+  latestMarriage: string;
+  nextMonthHasCorrespondingDay: boolean;
 }
 
-export const NOTICE_PERIOD_EMBED_PATH = '/embed/notice-period'
+export const NOTICE_PERIOD_EMBED_PATH = "/embed/notice-period";
 
 export const NOTICE_PERIOD_EMBED_CODE = `<div style="max-width: 700px; margin: 0 auto;">
   <iframe
@@ -14,9 +14,6 @@ export const NOTICE_PERIOD_EMBED_CODE = `<div style="max-width: 700px; margin: 0
     loading="lazy"
     style="display: block; width: 100%; height: 640px; border: 0; border-radius: 14px; background: #fafafa;"
   ></iframe>
-  <p style="margin: 10px 0 0; color: #595959; font: 13px/1.5 system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; text-align: center;">
-    Provided by <a href="https://noimeasy.au/" target="_blank" rel="noopener noreferrer" style="color: inherit !important; text-decoration: none !important;">NOIM Easy</a> to help <a href="https://marriedbyjosh.com/" target="_blank" rel="noopener noreferrer" style="color: inherit !important; text-decoration: none !important;">celebrants</a>.
-  </p>
 </div>
 <script>
   (function (script) {
@@ -28,75 +25,95 @@ export const NOTICE_PERIOD_EMBED_CODE = `<div style="max-width: 700px; margin: 0
       if (Number.isFinite(height) && height >= 360 && height <= 900) frame.style.height = Math.ceil(height) + 'px';
     });
   })(document.currentScript);
-</script>`
+</script>`;
+
+export const NOTICE_PERIOD_EMBED_ATTRIBUTION = `<p style="margin: 10px 0 0; color: #595959; font: 13px/1.5 system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; text-align: center;">
+  <a href="https://noimeasy.au/" target="_blank" rel="noopener noreferrer" style="color: inherit !important; text-decoration: none !important;">NOIM Easy notice-period calculator</a>
+</p>`;
 
 interface DateParts {
-  year: number
-  monthIndex: number
-  day: number
+  year: number;
+  monthIndex: number;
+  day: number;
 }
 
 function parseDateOnly(value: string): DateParts | null {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
-  if (!match) return null
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return null;
 
-  const year = Number(match[1])
-  const monthIndex = Number(match[2]) - 1
-  const day = Number(match[3])
-  const date = new Date(Date.UTC(year, monthIndex, day))
-  if (date.getUTCFullYear() !== year
-    || date.getUTCMonth() !== monthIndex
-    || date.getUTCDate() !== day) return null
+  const year = Number(match[1]);
+  const monthIndex = Number(match[2]) - 1;
+  const day = Number(match[3]);
+  const date = new Date(Date.UTC(year, monthIndex, day));
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== monthIndex ||
+    date.getUTCDate() !== day
+  )
+    return null;
 
-  return { year, monthIndex, day }
+  return { year, monthIndex, day };
 }
 
 function targetMonth(year: number, monthIndex: number, monthsToAdd: number) {
-  const date = new Date(Date.UTC(year, monthIndex + monthsToAdd, 1))
-  return { year: date.getUTCFullYear(), monthIndex: date.getUTCMonth() }
+  const date = new Date(Date.UTC(year, monthIndex + monthsToAdd, 1));
+  return { year: date.getUTCFullYear(), monthIndex: date.getUTCMonth() };
 }
 
 function daysInMonth(year: number, monthIndex: number): number {
-  return new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate()
+  return new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
 }
 
 function isoDate(year: number, monthIndex: number, day: number): string {
   return [
-    String(year).padStart(4, '0'),
-    String(monthIndex + 1).padStart(2, '0'),
-    String(day).padStart(2, '0'),
-  ].join('-')
+    String(year).padStart(4, "0"),
+    String(monthIndex + 1).padStart(2, "0"),
+    String(day).padStart(2, "0"),
+  ].join("-");
 }
 
 /**
  * Calculates the ordinary section 42 notice window using the statutory
  * definition of a month in section 2G of the Acts Interpretation Act 1901.
  */
-export function calculateNoticeWindow(receivedDate: string): NoticeWindow | null {
-  const received = parseDateOnly(receivedDate)
-  if (!received) return null
+export function calculateNoticeWindow(
+  receivedDate: string,
+): NoticeWindow | null {
+  const received = parseDateOnly(receivedDate);
+  if (!received) return null;
 
-  const next = targetMonth(received.year, received.monthIndex, 1)
-  const nextMonthDays = daysInMonth(next.year, next.monthIndex)
-  const nextMonthHasCorrespondingDay = received.day <= nextMonthDays
+  const next = targetMonth(received.year, received.monthIndex, 1);
+  const nextMonthDays = daysInMonth(next.year, next.monthIndex);
+  const nextMonthHasCorrespondingDay = received.day <= nextMonthDays;
 
-  let earliestMarriage: string
+  let earliestMarriage: string;
   if (nextMonthHasCorrespondingDay) {
-    earliestMarriage = isoDate(next.year, next.monthIndex, received.day)
+    earliestMarriage = isoDate(next.year, next.monthIndex, received.day);
   } else {
-    const followingMonth = targetMonth(received.year, received.monthIndex, 2)
-    earliestMarriage = isoDate(followingMonth.year, followingMonth.monthIndex, 1)
+    const followingMonth = targetMonth(received.year, received.monthIndex, 2);
+    earliestMarriage = isoDate(
+      followingMonth.year,
+      followingMonth.monthIndex,
+      1,
+    );
   }
 
-  const expiryMonth = targetMonth(received.year, received.monthIndex, 18)
-  const latestDay = Math.min(received.day, daysInMonth(expiryMonth.year, expiryMonth.monthIndex))
+  const expiryMonth = targetMonth(received.year, received.monthIndex, 18);
+  const latestDay = Math.min(
+    received.day,
+    daysInMonth(expiryMonth.year, expiryMonth.monthIndex),
+  );
 
   return {
     received: receivedDate,
     earliestMarriage,
-    latestMarriage: isoDate(expiryMonth.year, expiryMonth.monthIndex, latestDay),
+    latestMarriage: isoDate(
+      expiryMonth.year,
+      expiryMonth.monthIndex,
+      latestDay,
+    ),
     nextMonthHasCorrespondingDay,
-  }
+  };
 }
 
 export function getNoticePeriodCalculatorScript(): string {
@@ -187,7 +204,7 @@ export function getNoticePeriodCalculatorScript(): string {
   input.addEventListener('change', updateNoticeWindow);
   updateNoticeWindow();
 })();
-`
+`;
 }
 
 export function getNoticePeriodEmbedCopyScript(): string {
@@ -230,7 +247,7 @@ export function getNoticePeriodEmbedCopyScript(): string {
     }
   });
 })();
-`
+`;
 }
 
 export function getNoticePeriodEmbedResizeScript(): string {
@@ -247,5 +264,5 @@ export function getNoticePeriodEmbedResizeScript(): string {
   }
   sendHeight();
 })();
-`
+`;
 }

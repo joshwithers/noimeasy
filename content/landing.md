@@ -1,12 +1,12 @@
 # Prepare your Notice of Intended Marriage
 
-Getting married in Australia? Every couple must lodge a **Notice of Intended Marriage (NOIM)** with their marriage celebrant at least **one month** before the wedding. This app helps you prepare yours — accurately, privately, and in about 10 minutes.
+Getting married in Australia? Every couple must give a **Notice of Intended Marriage (NOIM)** to an authorised marriage celebrant at least **one month** before the wedding. This app helps you prepare the form — accurately, privately, and in about 10 minutes.
 
 ## What this app does
 
 The NOIM is a legal form required under **Section 42 of the Marriage Act 1961**. It tells the Australian Government that you intend to marry. Filling it out by hand can be fiddly — there are fields for both parties' personal details, parent information, conjugal status, and more.
 
-This app walks you through the form step by step, then generates a **completed PDF** ready to download and print.
+This app walks you through the form step by step, then generates a **prepared PDF** ready to download and check. Generating or downloading that PDF does not itself give legal notice to a celebrant.
 
 [[NOTICE_PROCESS]]
 
@@ -72,5 +72,5 @@ If you'd prefer to fill in the NOIM by hand, you can download a blank copy from 
 ## Important notes
 
 - This is a **preparation tool only** — it helps you fill in the form accurately before you meet with your celebrant
-- The generated PDF is **not yet legally valid** until signed by both parties and witnessed
-- Your celebrant will review everything and handle the official lodgement with the Registry of Births, Deaths and Marriages
+- The generated PDF is **not legal notice** just because it was created or downloaded. Each party must sign it under an authorised witness’s observation, then it must be given to the authorised celebrant who will solemnise the marriage.
+- Your celebrant will review the paperwork, confirm the required evidence and record when the notice is received. They manage the marriage documents and any Registry steps that apply after the marriage.
