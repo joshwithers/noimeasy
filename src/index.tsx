@@ -88,7 +88,10 @@ function NoticePeriodCalculator({ embedded = false }: { embedded?: boolean }) {
           Marriage Act 1961
         </a>
         . It assumes no prescribed authority has approved a shorter notice
-        period. Your celebrant must confirm the final dates.
+        period. A day 31 does not automatically roll over: notice received on
+        31 July ordinarily permits marriage on 31 August, while notice received
+        on 31 August ordinarily permits marriage from 1 October because
+        September has no day 31. Your celebrant must confirm the final dates.
       </p>
     </section>
   );
@@ -845,10 +848,13 @@ app.post("/submit", async (c) => {
     pdfBytes = await generateNoimPdf(data);
   } catch (error) {
     if (error instanceof UnsupportedPdfCharacterError) {
+      const characterDescription = error.character === "\n" || error.character === "\r"
+        ? "a line break"
+        : `the character ${JSON.stringify(error.character)}`;
       return c.json(
         {
           ok: false,
-          error: `The character ${JSON.stringify(error.character)} cannot be rendered safely in the official NOIM PDF. Please use the spelling shown in the Roman-alphabet section of the supporting document, or ask your celebrant for help.`,
+          error: `${error.fieldLabel} contains ${characterDescription}, which cannot be rendered safely in the official NOIM PDF. Please use the spelling shown in the Roman-alphabet section of the supporting document, or ask your celebrant for help.`,
         },
         422,
       );

@@ -3,12 +3,15 @@ import { PDFDocument, PDFName, type PDFFont, type PDFTextField } from 'pdf-lib'
 
 export class UnsupportedPdfCharacterError extends Error {
   readonly fieldName: string
+  readonly fieldLabel: string
   readonly character: string
 
   constructor(fieldName: string, character: string) {
-    super(`The character ${JSON.stringify(character)} in ${fieldName} cannot be rendered safely in the official NOIM PDF`)
+    const fieldLabel = PDF_FIELD_LABELS[fieldName] || 'A supplied value'
+    super(`The character ${JSON.stringify(character)} in ${fieldLabel} cannot be rendered safely in the official NOIM PDF`)
     this.name = 'UnsupportedPdfCharacterError'
     this.fieldName = fieldName
+    this.fieldLabel = fieldLabel
     this.character = character
   }
 }
@@ -86,6 +89,9 @@ function setCheckbox(
 function assertFontSupports(font: PDFFont, value: string, fieldName: string) {
   const supported = new Set(font.getCharacterSet())
   for (const character of value) {
+    // Newlines are layout instructions in the official form's multiline text
+    // fields, not glyphs that the embedded font needs to render.
+    if (character === '\n' || character === '\r') continue
     const codePoint = character.codePointAt(0)
     // pdf-lib/fontkit embeds these glyphs but does not perform the bidirectional
     // ordering and shaping that these scripts require. Reject them rather than

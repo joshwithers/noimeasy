@@ -1,6 +1,7 @@
 import { COUNTRIES } from '../shared/countries.ts'
 import { ageOnDate, isFieldVisible } from './logic.ts'
 import { noimSteps, type NoimField } from './schema.ts'
+import { normaliseNoimText } from './text-normalisation.ts'
 
 export interface NoimValidationResult {
   valid: boolean
@@ -78,7 +79,7 @@ function collectResidentialAddress(
       continue
     }
 
-    const value = rawValue.trim()
+    const value = normaliseNoimText(rawValue)
     parts[part.key] = value
     if (part.required && !value) {
       errors[inputKey] = `${part.label} is required`
@@ -87,10 +88,6 @@ function collectResidentialAddress(
     if (!value) continue
     if (value.length > part.maxLength) {
       errors[inputKey] = `${part.label} is too long`
-      continue
-    }
-    if (/[\u0000-\u001f\u007f]/u.test(value)) {
-      errors[inputKey] = `${part.label} contains an unsupported control character`
       continue
     }
     if (part.key === 'country' && !countrySet.has(value)) {
@@ -133,7 +130,7 @@ export function validateNoimSubmission(input: Record<string, unknown>): NoimVali
       data[field.name] = ''
       continue
     }
-    data[field.name] = rawValue.trim()
+    data[field.name] = normaliseNoimText(rawValue, isLegalNameField(field.name))
   }
 
   for (const field of fields) {
@@ -157,10 +154,6 @@ export function validateNoimSubmission(input: Record<string, unknown>): NoimVali
 
     if (value.length > maxLength(field)) {
       errors[field.name] = `${field.label} is too long`
-      continue
-    }
-    if (/[\u0000-\u001f\u007f]/u.test(value)) {
-      errors[field.name] = `${field.label} contains an unsupported control character`
       continue
     }
     if (isLegalNameField(field.name)

@@ -12,6 +12,7 @@ import {
   safePdfFilename,
   validateNoimSubmission,
 } from "../src/forms/noim/validation.ts";
+import { normaliseNoimText } from "../src/forms/noim/text-normalisation.ts";
 
 function isoDate(date: Date): string {
   return date.toISOString().slice(0, 10);
@@ -180,6 +181,27 @@ test("preserves legal-name casing and discards fields not on the party-completed
   assert.equal(result.valid, true, JSON.stringify(result.errors));
   assert.equal(result.data.p1_last_name, "d'ARC-McDONALD");
   assert.equal("wedding_location" in result.data, false);
+});
+
+test("cleans pasted controls and title-cases only uniformly cased legal names", () => {
+  assert.equal(normaliseNoimText("  ALEX\n\u200bSMITH\ufe0f  ", true), "Alex Smith");
+  assert.equal(normaliseNoimText("mary-jane o'neill", true), "Mary-Jane O'Neill");
+  assert.equal(normaliseNoimText("mcdonald", true), "McDonald");
+  assert.equal(normaliseNoimText("de Silva", true), "de Silva");
+  assert.equal(normaliseNoimText("ACME\tPTY LTD"), "ACME PTY LTD");
+
+  const input = validSubmission();
+  input.p1_first_name = "\u200bALEX\n";
+  input.p1_middle_names = "MARY\tJANE";
+  input.p1_address_line1 = "1 Example\r\nStreet";
+  input.p2_parent1_current_name = "taylor nguyen";
+
+  const result = validateNoimSubmission(input);
+  assert.equal(result.valid, true, JSON.stringify(result.errors));
+  assert.equal(result.data.p1_first_name, "Alex");
+  assert.equal(result.data.p1_middle_names, "Mary Jane");
+  assert.equal(result.data.p1_address.startsWith("1 Example Street\n"), true);
+  assert.equal(result.data.p2_parent1_current_name, "Taylor Nguyen");
 });
 
 test("supports a person with no family name without discarding additional given names", () => {
@@ -380,6 +402,9 @@ test("ships a syntactically valid client script with the DOB pattern intact", ()
   assert.equal(script.includes("metadata.options[rawReviewValue]"), true);
   assert.equal(script.includes("completion-next-steps"), true);
   assert.equal(script.includes("It is not legal notice yet"), true);
+  assert.equal(script.includes("var normaliseNoimText ="), true);
+  assert.equal(script.includes("normaliseFormTextFields();"), true);
+  assert.equal(script.includes("isLegalNameFieldName"), true);
   assert.equal(script.includes("localStorage"), false);
   assert.equal(script.includes("sessionStorage"), false);
 });

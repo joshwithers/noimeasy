@@ -73,6 +73,15 @@ test('leaves the official family-name item blank when a party has no family name
   assert.equal(form.getTextField('Person1GivenName').getText(), 'Jean Baptiste Emanuel')
 })
 
+test('renders assembled multiline residential addresses without treating line breaks as glyphs', async () => {
+  const input = validSubmission()
+  input.p1_address = '1 Example Street\nSouthbank, Melbourne\nVictoria 3006\nAustralia'
+
+  const bytes = await generateNoimPdfFromAssets(input, templateBytes, fontBytes)
+  const field = (await PDFDocument.load(bytes)).getForm().getTextField('Person1PlaceOfResidence')
+  assert.equal(field.getText(), input.p1_address)
+})
+
 test('rejects an unsupported PDF glyph instead of crashing or producing a missing-glyph box', async () => {
   for (const unsupportedName of ['李', 'محمد', 'שָׁלוֹם']) {
     const input = validSubmission()
@@ -81,7 +90,8 @@ test('rejects an unsupported PDF glyph instead of crashing or producing a missin
     await assert.rejects(
       () => generateNoimPdfFromAssets(input, templateBytes, fontBytes),
       (error: unknown) => error instanceof UnsupportedPdfCharacterError
-        && error.fieldName === 'Person1FamilyName',
+        && error.fieldName === 'Person1FamilyName'
+        && error.fieldLabel === "Party 1's family name",
     )
   }
 })

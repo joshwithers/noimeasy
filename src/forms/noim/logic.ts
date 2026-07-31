@@ -1,5 +1,6 @@
 import { noimSteps, type NoimCondition } from "./schema.ts";
 import { COUNTRIES } from "../shared/countries.ts";
+import { normaliseNoimText } from "./text-normalisation.ts";
 
 const reviewMetadata = Object.fromEntries(
   noimSteps
@@ -180,6 +181,10 @@ export function getNoimClientScript(): string {
   var proposedMarriageDateInput = form.querySelector('[name="proposed_marriage_date"]');
   var currentStep = 0;
   var COUNTRIES = ${JSON.stringify(["Unknown", ...COUNTRIES])};
+  // Esbuild may add calls to its private __name helper inside the shared
+  // function. The inlined browser copy only needs the functions themselves.
+  var __name = function(target) { return target; };
+  var normaliseNoimText = ${normaliseNoimText.toString()};
   var REVIEW_METADATA = ${JSON.stringify({
     proposed_marriage_date: {
       label: "Proposed marriage date",
@@ -191,6 +196,7 @@ export function getNoimClientScript(): string {
 
   // === Step Navigation ===
   function showStep(index) {
+    if (index === steps.length - 1) normaliseFormTextFields();
     steps.forEach(function(s, i) {
       s.style.display = i === index ? 'block' : 'none';
     });
@@ -208,6 +214,7 @@ export function getNoimClientScript(): string {
 
   function validateCurrentStep() {
     var step = steps[currentStep];
+    normaliseTextFields(step);
     var visibleFields = step.querySelectorAll('input:not([type=hidden]):not([type=radio]), select, textarea');
     var valid = true;
     var firstInvalid = null;
@@ -274,6 +281,30 @@ export function getNoimClientScript(): string {
     }
     return (el.value || '').trim();
   }
+
+  function isLegalNameFieldName(fieldName) {
+    return /_(?:first_name|last_name|middle_names|parent[12]_(?:current|birth)_name)$/.test(fieldName || '');
+  }
+
+  function normaliseTextField(field) {
+    if (!field || typeof field.value !== 'string') return;
+    field.value = normaliseNoimText(field.value, isLegalNameFieldName(field.name));
+  }
+
+  function normaliseTextFields(root) {
+    root.querySelectorAll('input[type="text"], input[type="email"], textarea').forEach(normaliseTextField);
+  }
+
+  function normaliseFormTextFields() {
+    normaliseTextFields(form);
+  }
+
+  form.addEventListener('blur', function(event) {
+    var field = event.target;
+    if (field && field.matches && field.matches('input[type="text"], input[type="email"], textarea')) {
+      normaliseTextField(field);
+    }
+  }, true);
 
   function ageFromDob(dateOfBirth, assessmentDate) {
     var match = /^(\\d{4})-(\\d{2})-(\\d{2})$/.exec(dateOfBirth);
@@ -771,6 +802,8 @@ export function getNoimClientScript(): string {
   // === Form submission via fetch ===
   form.addEventListener('submit', function(e) {
     e.preventDefault();
+    normaliseFormTextFields();
+    buildReviewSection();
     var formData = new FormData(form);
     var btn = submitBtnTop;
     var originalText = btn.textContent;

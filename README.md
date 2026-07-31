@@ -32,11 +32,12 @@ The calculator in `src/lib/notice-period.ts` applies the definition of a month i
 
 - If the following month has a corresponding numbered day, that is the first ordinary marriage date. For example, notice received on 5 January 2026 produces 5 February 2026.
 - If the following month has no corresponding day, the statutory month runs to the end of that month and the first marriage date is the following day. For example, notice received on 31 January 2026 produces 1 March 2026—not 28 February.
+- A date falling on the 31st does not automatically roll into the month after next. Notice received on 31 July produces 31 August because August has a corresponding day 31. Notice received on 31 August produces 1 October because September has no day 31.
 - Leap years are calculated rather than approximated as a fixed number of days.
 - The calculator also displays the final date in the ordinary 18-month window.
 - It does not assume that a prescribed authority has approved a shortening of time; the celebrant remains responsible for confirming the final date.
 
-The date logic is implemented as a dependency-free server helper and mirrored in the browser script. Both paths are covered by tests for corresponding-day, missing-day, invalid-date, and leap-year cases.
+The date logic is implemented as one dependency-free helper used by both the server and the browser script. Tests cover every date in a full 400-year Gregorian cycle, execute the browser calculator at month-end and leap-year boundaries, and exercise the copied iframe resize code.
 
 ### Embedding the calculator
 

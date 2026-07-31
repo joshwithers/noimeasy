@@ -603,6 +603,13 @@ export const NoimFormPage: FC<{ submitUrl: string }> = ({ submitUrl }) => (
             person or remotely by audio-visual link, subject to the location
             rules explained by the Attorney-General's Department.
           </p>
+          <p style="color:var(--text-muted);font-size:0.9rem">
+            Invisible formatting copied into a field is cleaned automatically.
+            Legal names typed entirely in uppercase or lowercase are changed to
+            title case; names with deliberate mixed capitalisation are left as
+            entered. Check every name against its supporting document in the
+            final review.
+          </p>
         </header>
 
         <form id="noim-form" method="post" action={submitUrl}>
