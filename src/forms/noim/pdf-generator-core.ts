@@ -1,5 +1,5 @@
 import fontkit from '@pdf-lib/fontkit'
-import { PDFDocument, PDFName, type PDFFont, type PDFTextField } from 'pdf-lib'
+import { PDFDocument, PDFName, layoutMultilineText, type PDFFont, type PDFTextField } from 'pdf-lib'
 
 export class UnsupportedPdfCharacterError extends Error {
   readonly fieldName: string
@@ -103,49 +103,42 @@ function assertFontSupports(font: PDFFont, value: string, fieldName: string) {
   }
 }
 
-function wrappedLineCount(text: string, font: PDFFont, fontSize: number, width: number): number {
-  let lineCount = 0
-  const spaceWidth = font.widthOfTextAtSize(' ', fontSize)
-
-  for (const explicitLine of text.split(/\r?\n/)) {
-    const words = explicitLine.trim().split(/\s+/).filter(Boolean)
-    if (!words.length) {
-      lineCount += 1
-      continue
-    }
-
-    let lineWidth = 0
-    lineCount += 1
-    for (const word of words) {
-      const wordWidth = font.widthOfTextAtSize(word, fontSize)
-      if (wordWidth > width) return Number.POSITIVE_INFINITY
-      const proposedWidth = lineWidth ? lineWidth + spaceWidth + wordWidth : wordWidth
-      if (proposedWidth > width) {
-        lineCount += 1
-        lineWidth = wordWidth
-      } else {
-        lineWidth = proposedWidth
-      }
-    }
-  }
-
-  return lineCount
-}
-
 function textFits(field: PDFTextField, font: PDFFont, value: string, fontSize: number): boolean {
   return field.acroField.getWidgets().every((widget) => {
     const rectangle = widget.getRectangle()
-    const width = Math.max(0, rectangle.width - 4)
-    const height = Math.max(0, rectangle.height - 4)
+    // Match pdf-lib's appearance provider, including border and text padding.
+    const inset = (widget.getBorderStyle()?.getWidth() ?? 0) + 1
+    const width = Math.max(0, rectangle.width - inset * 2)
+    const height = Math.max(0, rectangle.height - inset * 2)
 
     if (!field.isMultiline()) {
       return font.widthOfTextAtSize(value, fontSize) <= width
         && font.heightAtSize(fontSize) <= height
     }
 
-    const lines = wrappedLineCount(value, font, fontSize, width)
-    return Number.isFinite(lines) && lines * font.heightAtSize(fontSize) * 1.2 <= height
+    const layout = layoutMultilineText(value, {
+      font, fontSize, alignment: field.getAlignment(),
+      bounds: { x: 0, y: 0, width, height },
+    })
+    return layout.lines.every((line) => line.width <= width && line.y >= 0)
   })
+}
+
+/** Routes layout errors back to the original editable inputs. */
+export function pdfFieldInputNames(fieldName: string): string[] {
+  if (fieldName === 'RelatedPartiesRelationship') return ['relationship_details']
+  const match = /^Person([12])(.+)$/.exec(fieldName)
+  if (!match) return []
+  const prefix = `p${match[1]}_`
+  const suffixes: Record<string, string[]> = {
+    FamilyName: ['last_name'], GivenName: ['first_name', 'middle_names'],
+    UsualOccupation: ['occupation'], PlaceOfResidence: ['address_line1', 'address_line2', 'address_suburb', 'address_city', 'address_state', 'address_postcode', 'address_country'],
+    Birthplace: ['birth_city', 'birth_country', 'birth_state', 'birth_state_international'],
+    DateOfBirth: ['dob'],
+    Parent1FullCurrentName: ['parent1_current_name'], Parent1FullBirthName: ['parent1_birth_name'], Parent1CountryofBirth: ['parent1_birth_country'],
+    Parent2FullCurrentName: ['parent2_current_name'], Parent2FullBirthName: ['parent2_birth_name'], Parent2CountryofBirth: ['parent2_birth_country'],
+  }
+  return (suffixes[match[2]] || []).map((suffix) => prefix + suffix)
 }
 
 function legibleFontSize(field: PDFTextField, font: PDFFont, value: string): number | null {

@@ -60,7 +60,7 @@ The iframe endpoint contains only the branded calculator and its legal explanati
 - If a person has no family name, the official family-name item is left blank. A dash is never inserted as a substitute.
 - Dashes, punctuation-only strings, `N/A`, `none`, `null`, and `unknown` are rejected in party-name fields.
 - All given names can be entered separately as the first given name and additional given names.
-- Legal-name casing is preserved rather than automatically title-cased.
+- Legal names entered entirely in uppercase or lowercase are title-cased; deliberately mixed casing is preserved. Pasted invisible formatting is removed, and users must check names against their supporting documents.
 
 ### Dates of birth and proposed marriage date
 
@@ -86,8 +86,9 @@ The iframe endpoint contains only the branded calculator and its legal explanati
 
 ### Residential addresses
 
-- Each party supplies street address, optional unit/building details, suburb/locality, city/town, state/territory/province, postcode/ZIP code, and country.
-- The server validates and assembles those parts into the official PDF address field. They are not sent to a third-party address-lookup service.
+- Each party supplies a street address, suburb/locality/town and country, with optional unit/building details and a separate city if different. State and a four-digit postcode are required for Australia; international state/province and postcode fields are optional where not applicable.
+- A shared formatter assembles the complete address for both review and the official PDF. The PDF wraps the text to its available width rather than forcing every component onto a separate line. Identical locality/city entries are included once. No necessary detail is truncated or discarded, and addresses are not sent to a third-party lookup service.
+- Review rows provide Edit links. Server validation and PDF layout errors link back to the affected inputs without clearing the other answers.
 
 ### Conjugal status and previous marriages
 
@@ -124,8 +125,9 @@ The application intentionally has no database, KV namespace, object store, user 
 - Submitted particulars are held in Worker memory only while the request is validated and the PDF is generated.
 - Application code does not persist or deliberately log form fields.
 - The generated PDF is returned directly and is not retained by the application.
+- Answers and the retry-download link remain in the current browser page's memory; the application does not use browser storage. The application does not save that state for a later visit.
 - Identity documents are never uploaded.
-- PDF responses use `Cache-Control: no-store`.
+- HTML and submission responses use `Cache-Control: no-store, no-transform`. The latter prevents Cloudflare's automatic analytics injection; CSP also blocks external scripts. Recheck the deployed browser network requests after changing Cloudflare settings.
 
 Operators should still understand that Cloudflare and upstream network providers process ordinary connection metadata as part of serving requests. The application-level privacy promises above do not redefine those providers' independent infrastructure policies.
 
@@ -191,6 +193,15 @@ Run the complete release gate before committing or deploying:
 ```sh
 npm run check
 ```
+
+Run browser regression tests before releasing form changes:
+
+```sh
+npx playwright install chromium firefox webkit
+npm run test:browser
+```
+
+The suite starts a local Worker and checks seven-step completion, full address review/editing, actual PDF downloads and repeat downloads, no-family-name and overseas cases, validation recovery, failed-request retries, calculator boundaries, request privacy and rate limits in Chromium, Firefox and mobile WebKit. It uses synthetic particulars only.
 
 That command runs:
 

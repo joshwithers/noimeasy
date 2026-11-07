@@ -41,7 +41,7 @@ const NoimFieldComponent: FC<{ field: NoimField }> = ({ field }) => {
                 type="text"
                 name={`${field.name}_line1`}
                 required
-                autocomplete="address-line1"
+                autocomplete={`section-${field.name} address-line1`}
                 maxlength={300}
               />
             </label>
@@ -50,48 +50,45 @@ const NoimFieldComponent: FC<{ field: NoimField }> = ({ field }) => {
               <input
                 type="text"
                 name={`${field.name}_line2`}
-                autocomplete="address-line2"
+                autocomplete={`section-${field.name} address-line2`}
+                placeholder="e.g. Unit 1 or Level 2"
                 maxlength={160}
               />
             </label>
             <label>
-              Suburb or locality<span style="color:var(--required)"> *</span>
+              Suburb, locality or town<span style="color:var(--required)"> *</span>
               <input
                 type="text"
                 name={`${field.name}_suburb`}
                 required
-                autocomplete="address-level2"
+                autocomplete={`section-${field.name} address-level2`}
                 maxlength={160}
               />
             </label>
             <label>
-              City or town<span style="color:var(--required)"> *</span>
+              City (if different from locality)
               <input
                 type="text"
                 name={`${field.name}_city`}
-                required
                 autocomplete="off"
                 maxlength={160}
               />
             </label>
             <label>
               State, territory or province
-              <span style="color:var(--required)"> *</span>
               <input
                 type="text"
                 name={`${field.name}_state`}
-                required
-                autocomplete="address-level1"
+                autocomplete={`section-${field.name} address-level1`}
                 maxlength={160}
               />
             </label>
             <label>
-              Postcode or ZIP code<span style="color:var(--required)"> *</span>
+              Postcode or ZIP code
               <input
                 type="text"
                 name={`${field.name}_postcode`}
-                required
-                autocomplete="postal-code"
+                autocomplete={`section-${field.name} postal-code`}
                 maxlength={32}
               />
             </label>
@@ -121,7 +118,8 @@ const NoimFieldComponent: FC<{ field: NoimField }> = ({ field }) => {
           </div>
           <small style="color:var(--text-hint)">
             These details stay in this form and are assembled into your official
-            PDF.
+            PDF. Include state and postcode for Australian addresses. For an
+            overseas address, include them where applicable.
           </small>
         </fieldset>
       </div>
@@ -263,7 +261,7 @@ const NoimStepComponent: FC<{ step: NoimStep; index: number }> = ({
 }) => (
   <div class="noim-step" style={index === 0 ? "" : "display:none"}>
     <hgroup>
-      <h3>{step.title}</h3>
+      <h2>{step.title}</h2>
       {step.description && <p>{step.description}</p>}
     </hgroup>
 
@@ -309,6 +307,9 @@ const NoimStepComponent: FC<{ step: NoimStep; index: number }> = ({
         </button>
         <div
           id="form-feedback"
+          role="status"
+          aria-live="polite"
+          tabindex={-1}
           style="display:none;margin-bottom:1.5rem;padding:12px 16px;border-radius:3px;font-size:0.92rem"
         ></div>
         <section
@@ -319,7 +320,7 @@ const NoimStepComponent: FC<{ step: NoimStep; index: number }> = ({
         >
           <h3 id="completion-next-steps-heading">Optional next steps</h3>
           <p>
-            Your PDF download is complete. These links are optional and open
+            Your PDF is ready. These links are optional and open
             separately; they do not send your NOIM details anywhere.
           </p>
           <ul>
@@ -500,8 +501,11 @@ export const NoimFormPage: FC<{ submitUrl: string }> = ({ submitUrl }) => (
         .step-nav { display: flex; justify-content: space-between; align-items: center; margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--border); }
         .step-nav button { min-width: 120px; border-radius: 3px; }
         #step-indicator { color: var(--text-muted); font-size: 14px; letter-spacing: 0.02em; }
+        #review-section table { table-layout:fixed; width:100%; }
+        #review-section th, #review-section td { overflow-wrap:anywhere; vertical-align:top; }
+        .review-edit { display:block; width:auto; padding:0; margin:0.35rem 0 0; border:0; background:none; color:var(--text); font-size:0.8rem; text-decoration:underline; }
         hgroup { margin-bottom: 1.5rem; }
-        hgroup h3 { color: var(--text); }
+        hgroup h2 { font-size:1.5rem; color: var(--text); }
         fieldset { margin: 0; }
         .dob-age-note { display:none;margin-top:0.4rem;padding:0.65rem 0.75rem;border-radius:3px;line-height:1.45; }
         .dob-age-note.warning { display:block;background:#fff7ed;color:#9a3412;border:1px solid #fed7aa; }
@@ -591,7 +595,7 @@ export const NoimFormPage: FC<{ submitUrl: string }> = ({ submitUrl }) => (
 
       <main class="container" style="max-width:700px">
         <header style="text-align:center;margin-bottom:2rem">
-          <h2 style="color:var(--text)">Prepare your NOIM</h2>
+          <h1 style="color:var(--text);font-size:2rem">Prepare your NOIM</h1>
           <p style="color:var(--text-muted)">
             Fill in your details exactly as they should appear on the official
             form. When you're done, you'll get a prepared NOIM PDF to download,
@@ -612,7 +616,8 @@ export const NoimFormPage: FC<{ submitUrl: string }> = ({ submitUrl }) => (
           </p>
         </header>
 
-        <form id="noim-form" method="post" action={submitUrl}>
+        <noscript><p>This step-by-step form needs JavaScript. Enable it to continue, or <a href="https://www.ag.gov.au/families-and-marriage/publications/notice-intended-marriage">download the official blank NOIM</a>.</p></noscript>
+        <form id="noim-form" method="post" action={submitUrl} novalidate>
           {noimSteps.map((step, i) => (
             <NoimStepComponent step={step} index={i} />
           ))}

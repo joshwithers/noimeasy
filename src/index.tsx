@@ -6,6 +6,7 @@ import {
   generateNoimPdf,
   PdfFieldOverflowError,
   UnsupportedPdfCharacterError,
+  pdfFieldInputNames,
 } from "./forms/noim/pdf-generator";
 import {
   safePdfFilename,
@@ -32,6 +33,28 @@ import picoCss from "../content/pico.min.css";
 import occupationsText from "./forms/noim/occupations.txt";
 
 const app = new Hono<Env>();
+
+// Prevent edge-injected analytics and keep all form/PDF responses private.
+app.use('*', async (c, next) => {
+  await next();
+  c.header('X-Content-Type-Options', 'nosniff');
+  c.header('Referrer-Policy', 'no-referrer');
+  if (c.req.path === '/submit') c.header('Cache-Control', 'no-store, no-transform');
+  if (c.res.headers.get('Content-Type')?.includes('text/html')) {
+    c.header('Cache-Control', 'no-store, no-transform');
+    if (c.req.path !== NOTICE_PERIOD_EMBED_PATH) {
+      c.header('Content-Security-Policy', "default-src 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'");
+    }
+  }
+});
+
+app.onError(() => {
+  // Never log request bodies, particulars, or errors that could contain them.
+  return new Response(JSON.stringify({ ok: false, error: 'Unable to generate the PDF right now. Your entries are still in the form. Please try again.' }), {
+    status: 500,
+    headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store, no-transform' },
+  });
+});
 
 function NoticePeriodCalculator({ embedded = false }: { embedded?: boolean }) {
   const linkTarget = embedded ? "_blank" : undefined;
@@ -148,7 +171,7 @@ app.get("/occupations.txt", () => {
 app.get(NOTICE_PERIOD_EMBED_PATH, (c) => {
   c.header(
     "Content-Security-Policy",
-    "default-src 'none'; img-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors *",
+    "default-src 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors *",
   );
   c.header("Referrer-Policy", "no-referrer");
   c.header("X-Content-Type-Options", "nosniff");
@@ -819,7 +842,7 @@ app.post("/submit", async (c) => {
     if (error instanceof FormBodyTooLargeError) {
       return c.json({ ok: false, error: "Form submission is too large." }, 413);
     }
-    throw error;
+    return c.json({ ok: false, error: 'Unable to read the form submission. Please try again.' }, 400);
   }
 
   // Honeypot check
@@ -855,6 +878,7 @@ app.post("/submit", async (c) => {
         {
           ok: false,
           error: `${error.fieldLabel} contains ${characterDescription}, which cannot be rendered safely in the official NOIM PDF. Please use the spelling shown in the Roman-alphabet section of the supporting document, or ask your celebrant for help.`,
+          fields: Object.fromEntries(pdfFieldInputNames(error.fieldName).map((name) => [name, error.message])),
         },
         422,
       );
@@ -863,7 +887,8 @@ app.post("/submit", async (c) => {
       return c.json(
         {
           ok: false,
-          error: `${error.fieldLabel} is too long to fit legibly in the official NOIM PDF. Check the particulars against the supporting documents and ask an authorised celebrant for help rather than letting the legal form clip them.`,
+          error: `${error.fieldLabel} is too long to fit legibly in the official NOIM PDF. Edit the affected details and check for duplicated text. Keep every necessary detail; if it still does not fit, ask your celebrant for help with the official form.`,
+          fields: Object.fromEntries(pdfFieldInputNames(error.fieldName).map((name) => [name, error.message])),
         },
         422,
       );

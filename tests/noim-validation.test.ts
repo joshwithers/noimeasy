@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
+import { validSubmission } from "./fixtures.ts";
 import { noimSteps } from "../src/forms/noim/schema.ts";
 import {
   ageOnDate,
@@ -29,64 +30,6 @@ function dateForAgeOn(age: number, onDate: string): string {
   return isoDate(new Date(Date.UTC(year - age, month - 1, day)));
 }
 
-function validSubmission(): Record<string, string> {
-  return {
-    proposed_marriage_date: dateYearsFromNow(1),
-    p1_description: "partner",
-    p1_has_family_name: "yes",
-    p1_last_name: "O'NEILL",
-    p1_first_name: "Alex",
-    p1_middle_names: "Quinn",
-    p1_gender: "non-binary",
-    p1_occupation: "Engineer",
-    p1_address_line1: "1 Example Street",
-    p1_address_line2: "",
-    p1_address_suburb: "Southbank",
-    p1_address_city: "Melbourne",
-    p1_address_state: "Victoria",
-    p1_address_postcode: "3006",
-    p1_address_country: "Australia",
-    p1_conjugal_status: "divorce_pending",
-    p1_birth_country: "Australia",
-    p1_birth_city: "Melbourne",
-    p1_birth_state: "VIC",
-    p1_birth_state_international: "",
-    p1_dob: "1990-02-28",
-    p1_parent1_current_name: "Unknown",
-    p1_parent1_birth_name: "Unknown",
-    p1_parent1_birth_country: "Unknown",
-    p1_parent2_applicable: "no",
-    p2_description: "groom",
-    p2_has_family_name: "yes",
-    p2_last_name: "Nguyen",
-    p2_first_name: "Sam",
-    p2_middle_names: "",
-    p2_gender: "",
-    p2_occupation: "Teacher",
-    p2_address_line1: "2 Example Road",
-    p2_address_line2: "",
-    p2_address_suburb: "The Rocks",
-    p2_address_city: "Sydney",
-    p2_address_state: "New South Wales",
-    p2_address_postcode: "2000",
-    p2_address_country: "Australia",
-    p2_conjugal_status: "never_married",
-    p2_birth_country: "New Zealand",
-    p2_birth_city: "Auckland",
-    p2_birth_state: "",
-    p2_birth_state_international: "Auckland",
-    p2_dob: "1992-07-09",
-    p2_parent1_current_name: "Taylor Nguyen",
-    p2_parent1_birth_name: "Taylor Smith",
-    p2_parent1_birth_country: "New Zealand",
-    p2_parent2_applicable: "yes",
-    p2_parent2_current_name: "Jordan Nguyen",
-    p2_parent2_birth_name: "Jordan Nguyen",
-    p2_parent2_birth_country: "New Zealand",
-    parties_related: "no",
-    relationship_details: "",
-  };
-}
 
 test("uses the Australian legal-date timezone for date-only checks", () => {
   assert.equal(
@@ -104,13 +47,13 @@ test("requires a complete residential address and assembles it for the official 
   assert.equal(result.valid, true, JSON.stringify(result.errors));
   assert.equal(
     result.data.p1_address,
-    "1 Example Street\nSouthbank, Melbourne\nVictoria 3006\nAustralia",
+    "1 Example Street, Southbank, Melbourne, Victoria 3006, Australia",
   );
 
-  input.p1_address_city = "";
+  input.p1_address_suburb = "";
   input.p2_address_country = "Atlantis";
   const invalid = validateNoimSubmission(input);
-  assert.match(invalid.errors.p1_address_city, /required/);
+  assert.match(invalid.errors.p1_address_suburb, /required/);
   assert.match(invalid.errors.p2_address_country, /country list/);
 });
 
@@ -127,6 +70,34 @@ test("accepts every official conjugal status, including divorce pending", () => 
     assert.equal(result.valid, true, JSON.stringify(result.errors));
     assert.equal(result.data.p1_conjugal_status, status);
   }
+});
+
+test("accepts localities without a separate city and overseas addresses without a province or postcode", () => {
+  const input = validSubmission();
+  input.p1_address_city = "";
+  input.p2_address_country = "Hong Kong";
+  input.p2_address_city = "";
+  input.p2_address_state = "";
+  input.p2_address_postcode = "";
+  const result = validateNoimSubmission(input);
+  assert.equal(result.valid, true, JSON.stringify(result.errors));
+  assert.equal(result.data.p2_address, "2 Example Road, The Rocks, Hong Kong");
+});
+
+test("still requires state and a four-digit postcode for Australian addresses", () => {
+  const input = validSubmission();
+  input.p1_address_state = "";
+  input.p1_address_postcode = "ABC";
+  const result = validateNoimSubmission(input);
+  assert.match(result.errors.p1_address_state, /required/);
+  assert.match(result.errors.p1_address_postcode, /four digits/);
+});
+
+test("does not duplicate a city that is the same as the locality", () => {
+  const input = validSubmission();
+  input.p1_address_city = "southbank";
+  assert.equal(validateNoimSubmission(input).data.p1_address,
+    "1 Example Street, Southbank, Victoria 3006, Australia");
 });
 
 test("requires official fields and conditionally requires relationship and Parent 2 details", () => {
@@ -200,7 +171,7 @@ test("cleans pasted controls and title-cases only uniformly cased legal names", 
   assert.equal(result.valid, true, JSON.stringify(result.errors));
   assert.equal(result.data.p1_first_name, "Alex");
   assert.equal(result.data.p1_middle_names, "Mary Jane");
-  assert.equal(result.data.p1_address.startsWith("1 Example Street\n"), true);
+  assert.equal(result.data.p1_address.startsWith("1 Example Street, "), true);
   assert.equal(result.data.p2_parent1_current_name, "Taylor Nguyen");
 });
 

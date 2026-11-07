@@ -14,13 +14,13 @@ This app walks you through the form step by step, then generates a **prepared PD
 
 This app was built with a **privacy-first approach**. Your personal details are sensitive — names, dates of birth, addresses, parent information — and they're treated that way.
 
-- **No data is stored.** Your form responses exist only in memory while the PDF is being generated, then they're gone. There is no database, no server-side storage, no logs of your personal information.
+- **No server-side storage.** Your answers remain in this browser page while you use it. The server processes them in memory only to generate your PDF, then does not retain them. There is no database and no application logging of your personal information.
 - **No accounts or sign-ups.** You don't need to create a login or hand over an email address to use the form.
 - **No tracking or analytics.** There are no cookies, analytics or advertising pixels. Address details stay in the form and are included only when you generate your PDF.
 - **No document uploads.** Your celebrant must be satisfied about your identity and must receive evidence of date and place of birth before the marriage — this app never asks you to upload or photograph those documents.
 - **Secure by default.** The app runs on Cloudflare's global network over HTTPS, so your data is encrypted in transit.
 
-In short: your data comes in, your PDF goes out, and nothing is kept.
+Your downloaded PDF is saved by your browser. This service does not keep a copy. The application does not save your answers for a later visit.
 
 ## Who is this for?
 

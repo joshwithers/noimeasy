@@ -1,12 +1,15 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
-import { PDFDocument } from 'pdf-lib'
+import { PDFDocument, PDFName } from 'pdf-lib'
 import {
   generateNoimPdfFromAssets,
   PdfFieldOverflowError,
   UnsupportedPdfCharacterError,
+  pdfFieldInputNames,
 } from '../src/forms/noim/pdf-generator-core.ts'
+import { validateNoimSubmission } from '../src/forms/noim/validation.ts'
+import { validSubmission as completeSubmission } from './fixtures.ts'
 
 const templateBytes = readFileSync(new URL('../src/forms/noim/noim-blank.pdf', import.meta.url))
 const fontBytes = readFileSync(new URL('../node_modules/dejavu-fonts-ttf/ttf/DejaVuSans.ttf', import.meta.url))
@@ -128,4 +131,59 @@ test('does not repeat unknown birthplace particulars in the official field', asy
   const bytes = await generateNoimPdfFromAssets(input, templateBytes, fontBytes)
   const field = (await PDFDocument.load(bytes)).getForm().getTextField('Person1Birthplace')
   assert.equal(field.getText(), 'Unknown')
+})
+
+test('both parties can generate a legible PDF with every address component, including a unit', async () => {
+  const input = completeSubmission()
+  input.p1_address_line2 = 'Unit 1'
+  input.p2_address_line2 = 'Apartment 12, Example Building'
+  const result = validateNoimSubmission(input)
+  assert.equal(result.valid, true, JSON.stringify(result.errors))
+  const bytes = await generateNoimPdfFromAssets(result.data, templateBytes, fontBytes)
+  const form = (await PDFDocument.load(bytes)).getForm()
+  for (const party of [1, 2]) {
+    const field = form.getTextField(`Person${party}PlaceOfResidence`)
+    assert.equal(field.getText(), result.data[`p${party}_address`])
+    // The original five-line assembly failed even at 6pt. These now fit at 8pt.
+    assert.match(field.acroField.getDefaultAppearance() || '', /\/DejaVuSans 8 Tf/)
+    assert.equal(field.isMultiline(), true)
+    assert.ok(field.acroField.getWidgets()[0].getAppearances()?.normal)
+  }
+})
+
+test('a genuinely oversized address fails without dropping any particulars and points back to editable inputs', async () => {
+  const input = completeSubmission()
+  input.p1_address_line1 = 'Very Long Street Name '.repeat(12)
+  const result = validateNoimSubmission(input)
+  assert.equal(result.valid, true)
+  await assert.rejects(
+    () => generateNoimPdfFromAssets(result.data, templateBytes, fontBytes),
+    (error: unknown) => error instanceof PdfFieldOverflowError
+      && error.fieldName === 'Person1PlaceOfResidence',
+  )
+  assert.deepEqual(pdfFieldInputNames('Person1PlaceOfResidence'), [
+    'p1_address_line1', 'p1_address_line2', 'p1_address_suburb', 'p1_address_city',
+    'p1_address_state', 'p1_address_postcode', 'p1_address_country',
+  ])
+})
+
+test('maps all official conjugal statuses and party choices without filling celebrant or signature fields', async () => {
+  const statuses = { never_married: 'Never validly married', divorced: 'Divorced', widowed: 'Widowed', divorce_pending: 'Divorce pending' }
+  for (const status of Object.keys(statuses)) {
+    const input = validSubmission()
+    input.p1_conjugal_status = status
+    const pdf = await PDFDocument.load(await generateNoimPdfFromAssets(input, templateBytes, fontBytes))
+    const form = pdf.getForm()
+    const expectedStatus = statuses[status as keyof typeof statuses]
+    assert.equal(form.getCheckBox('Person1ConjugalStatus').acroField.getValue().decodeText(), expectedStatus)
+    for (const widget of form.getCheckBox('Person1ConjugalStatus').acroField.getWidgets()) {
+      assert.equal(widget.getAppearanceState()?.decodeText(), widget.getOnValue()?.decodeText() === expectedStatus ? expectedStatus : 'Off')
+    }
+    assert.equal(form.getTextField('Person1GivenName').getText(), 'Alex Quinn')
+    assert.equal(form.getTextField('Person2DateOfBirth').getText(), '9 July 1992')
+    assert.equal(form.getTextField('Person2Parent2FullBirthName').getText(), 'Jordan Nguyen')
+    for (const field of form.getFields().filter((field) => /Celebrant|Signature|Witness/.test(field.getName()))) {
+      assert.equal(field.acroField.dict.get(PDFName.of('V')), undefined, field.getName())
+    }
+  }
 })

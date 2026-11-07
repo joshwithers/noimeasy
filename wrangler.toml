@@ -1,6 +1,6 @@
 name = "noim-prep"
 main = "src/index.tsx"
-compatibility_date = "2026-07-19"
+compatibility_date = "2026-11-07"
 # Replace with your own Cloudflare account ID (or remove to be prompted on deploy)
 # account_id = ""
 
