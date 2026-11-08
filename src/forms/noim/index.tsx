@@ -1,60 +1,96 @@
-import type { FC } from 'hono/jsx'
-import { noimSteps, type NoimField, type NoimStep } from './schema'
-import { getNoimClientScript } from './logic'
+import type { FC } from "hono/jsx";
+import { noimSteps, type NoimField, type NoimStep } from "./schema";
+import { getNoimClientScript } from "./logic";
 // Countries list is now embedded in client JS (logic.ts) for the custom dropdown
 
 const NoimFieldComponent: FC<{ field: NoimField }> = ({ field }) => {
-  const wrapperAttrs: Record<string, string> = { class: 'noim-field' }
+  const wrapperAttrs: Record<string, string> = { class: "noim-field" };
   if (field.conditions && field.conditions.length > 0) {
-    wrapperAttrs['data-conditions'] = JSON.stringify(field.conditions)
-    wrapperAttrs['style'] = 'display:none'
+    wrapperAttrs["data-conditions"] = JSON.stringify(field.conditions);
+    wrapperAttrs["style"] = "display:none";
   }
 
-  if (field.type === 'checkbox') {
+  if (field.type === "checkbox") {
     return (
       <div {...wrapperAttrs}>
         <label style="display:inline-flex;align-items:center;gap:8px;font-weight:normal;cursor:pointer">
-          <input
-            type="checkbox"
-            name={field.name}
-            value="yes"
-          />
+          <input type="checkbox" name={field.name} value="yes" />
           {field.label}
         </label>
-        {field.helpText && <small style="color:var(--text-hint);display:block;margin-top:4px">{field.helpText}</small>}
+        {field.helpText && (
+          <small style="color:var(--text-hint);display:block;margin-top:4px">
+            {field.helpText}
+          </small>
+        )}
       </div>
-    )
+    );
   }
 
-  if (field.type === 'address') {
+  if (field.type === "address") {
     return (
       <div {...wrapperAttrs}>
         <fieldset class="residential-address">
-          <legend>{field.label}<span style="color:var(--required)"> *</span></legend>
+          <legend>
+            {field.label}
+            <span style="color:var(--required)"> *</span>
+          </legend>
           <div class="residential-address-grid">
             <label class="residential-address-wide">
               Street address<span style="color:var(--required)"> *</span>
-              <input type="text" name={`${field.name}_line1`} required autocomplete="address-line1" maxlength={300} />
+              <input
+                type="text"
+                name={`${field.name}_line1`}
+                required
+                autocomplete={`section-${field.name} address-line1`}
+                maxlength={300}
+              />
             </label>
             <label class="residential-address-wide">
               Apartment, unit, level or building
-              <input type="text" name={`${field.name}_line2`} autocomplete="address-line2" maxlength={160} />
+              <input
+                type="text"
+                name={`${field.name}_line2`}
+                autocomplete={`section-${field.name} address-line2`}
+                placeholder="e.g. Unit 1 or Level 2"
+                maxlength={160}
+              />
             </label>
             <label>
-              Suburb or locality<span style="color:var(--required)"> *</span>
-              <input type="text" name={`${field.name}_suburb`} required autocomplete="address-level2" maxlength={160} />
+              Suburb, locality or town<span style="color:var(--required)"> *</span>
+              <input
+                type="text"
+                name={`${field.name}_suburb`}
+                required
+                autocomplete={`section-${field.name} address-level2`}
+                maxlength={160}
+              />
             </label>
             <label>
-              City or town<span style="color:var(--required)"> *</span>
-              <input type="text" name={`${field.name}_city`} required autocomplete="off" maxlength={160} />
+              City (if different from locality)
+              <input
+                type="text"
+                name={`${field.name}_city`}
+                autocomplete="off"
+                maxlength={160}
+              />
             </label>
             <label>
-              State, territory or province<span style="color:var(--required)"> *</span>
-              <input type="text" name={`${field.name}_state`} required autocomplete="address-level1" maxlength={160} />
+              State, territory or province
+              <input
+                type="text"
+                name={`${field.name}_state`}
+                autocomplete={`section-${field.name} address-level1`}
+                maxlength={160}
+              />
             </label>
             <label>
-              Postcode or ZIP code<span style="color:var(--required)"> *</span>
-              <input type="text" name={`${field.name}_postcode`} required autocomplete="postal-code" maxlength={32} />
+              Postcode or ZIP code
+              <input
+                type="text"
+                name={`${field.name}_postcode`}
+                autocomplete={`section-${field.name} postal-code`}
+                maxlength={32}
+              />
             </label>
             <label class="residential-address-wide">
               Country<span style="color:var(--required)"> *</span>
@@ -72,14 +108,22 @@ const NoimFieldComponent: FC<{ field: NoimField }> = ({ field }) => {
                   aria-expanded="false"
                   aria-controls={`${field.name}_country-countries`}
                 />
-                <div id={`${field.name}_country-countries`} class="country-dropdown" role="listbox"></div>
+                <div
+                  id={`${field.name}_country-countries`}
+                  class="country-dropdown"
+                  role="listbox"
+                ></div>
               </div>
             </label>
           </div>
-          <small style="color:var(--text-hint)">These details stay in this form and are assembled into your official PDF.</small>
+          <small style="color:var(--text-hint)">
+            These details stay in this form and are assembled into your official
+            PDF. Include state and postcode for Australian addresses. For an
+            overseas address, include them where applicable.
+          </small>
         </fieldset>
       </div>
-    )
+    );
   }
 
   return (
@@ -88,14 +132,14 @@ const NoimFieldComponent: FC<{ field: NoimField }> = ({ field }) => {
         {field.label}
         {field.required && <span style="color:var(--required)"> *</span>}
 
-        {field.type === 'country' ? (
+        {field.type === "country" ? (
           <div class="country-select">
             <input
               type="text"
               name={field.name}
               class="country-search"
               required={field.required}
-              data-was-required={field.required ? 'true' : 'false'}
+              data-was-required={field.required ? "true" : "false"}
               placeholder="Start typing a country..."
               autocomplete="off"
               maxlength={160}
@@ -104,28 +148,36 @@ const NoimFieldComponent: FC<{ field: NoimField }> = ({ field }) => {
               aria-expanded="false"
               aria-controls={`${field.name}-countries`}
             />
-            <div id={`${field.name}-countries`} class="country-dropdown" role="listbox"></div>
+            <div
+              id={`${field.name}-countries`}
+              class="country-dropdown"
+              role="listbox"
+            ></div>
           </div>
-        ) : field.type === 'date' ? (
+        ) : field.type === "date" ? (
           <>
             <input
               type="date"
               name={field.name}
               required={field.required}
-              data-was-required={field.required ? 'true' : 'false'}
+              data-was-required={field.required ? "true" : "false"}
             />
-            {field.name.endsWith('_dob') && (
-              <small class="dob-age-note" role="status" aria-live="polite"></small>
+            {field.name.endsWith("_dob") && (
+              <small
+                class="dob-age-note"
+                role="status"
+                aria-live="polite"
+              ></small>
             )}
           </>
-        ) : field.name.endsWith('_occupation') ? (
+        ) : field.name.endsWith("_occupation") ? (
           <div class="occupation-select">
             <input
               type="text"
               name={field.name}
               class="occupation-input"
               required={field.required}
-              data-was-required={field.required ? 'true' : 'false'}
+              data-was-required={field.required ? "true" : "false"}
               placeholder="Start typing an occupation"
               maxlength={160}
               autocomplete="off"
@@ -139,38 +191,46 @@ const NoimFieldComponent: FC<{ field: NoimField }> = ({ field }) => {
               class="occupation-dropdown"
               role="listbox"
             ></div>
-            <small class="occupation-hint">Choose a suggestion or keep typing your own occupation.</small>
+            <small class="occupation-hint">
+              Choose a suggestion or keep typing your own occupation.
+            </small>
           </div>
-        ) : field.type === 'text' || field.type === 'email' ? (
+        ) : field.type === "text" || field.type === "email" ? (
           <input
             type={field.type}
             name={field.name}
             required={field.required}
-            data-was-required={field.required ? 'true' : 'false'}
-            placeholder={field.placeholder || ''}
-            maxlength={field.type === 'email' ? 254 : field.type === 'text' ? 160 : undefined}
+            data-was-required={field.required ? "true" : "false"}
+            placeholder={field.placeholder || ""}
+            maxlength={
+              field.type === "email"
+                ? 254
+                : field.type === "text"
+                  ? 160
+                  : undefined
+            }
           />
-        ) : field.type === 'textarea' ? (
+        ) : field.type === "textarea" ? (
           <textarea
             name={field.name}
             required={field.required}
-            data-was-required={field.required ? 'true' : 'false'}
-            placeholder={field.placeholder || ''}
+            data-was-required={field.required ? "true" : "false"}
+            placeholder={field.placeholder || ""}
             rows={3}
             maxlength={300}
           />
-        ) : field.type === 'select' ? (
+        ) : field.type === "select" ? (
           <select
             name={field.name}
             required={field.required}
-            data-was-required={field.required ? 'true' : 'false'}
+            data-was-required={field.required ? "true" : "false"}
           >
             <option value="">— Select —</option>
             {field.options?.map((opt) => (
               <option value={opt.value}>{opt.label}</option>
             ))}
           </select>
-        ) : field.type === 'radio' ? (
+        ) : field.type === "radio" ? (
           <fieldset style="border:none;padding:0;margin:4px 0">
             {field.options?.map((opt) => (
               <label style="display:inline-flex;align-items:center;gap:4px;margin-right:1rem;font-weight:normal">
@@ -179,7 +239,7 @@ const NoimFieldComponent: FC<{ field: NoimField }> = ({ field }) => {
                   name={field.name}
                   value={opt.value}
                   required={field.required}
-                  data-was-required={field.required ? 'true' : 'false'}
+                  data-was-required={field.required ? "true" : "false"}
                   checked={opt.value === field.defaultValue}
                 />
                 {opt.label}
@@ -188,19 +248,24 @@ const NoimFieldComponent: FC<{ field: NoimField }> = ({ field }) => {
           </fieldset>
         ) : null}
       </label>
-      {field.helpText && <small style="color:var(--text-hint)">{field.helpText}</small>}
+      {field.helpText && (
+        <small style="color:var(--text-hint)">{field.helpText}</small>
+      )}
     </div>
-  )
-}
+  );
+};
 
-const NoimStepComponent: FC<{ step: NoimStep; index: number }> = ({ step, index }) => (
-  <div class="noim-step" style={index === 0 ? '' : 'display:none'}>
+const NoimStepComponent: FC<{ step: NoimStep; index: number }> = ({
+  step,
+  index,
+}) => (
+  <div class="noim-step" style={index === 0 ? "" : "display:none"}>
     <hgroup>
-      <h3>{step.title}</h3>
+      <h2>{step.title}</h2>
       {step.description && <p>{step.description}</p>}
     </hgroup>
 
-    {step.id === 'party1-personal' ? (
+    {step.id === "party1-personal" ? (
       <>
         <div class="noim-field">
           <label>
@@ -213,29 +278,101 @@ const NoimStepComponent: FC<{ step: NoimStep; index: number }> = ({ step, index 
             />
           </label>
           <small style="color:var(--text-hint)">
-            Used only to check age requirements. It is not added to the NOIM PDF.
+            Used only to check age requirements. It is not added to the NOIM
+            PDF.
           </small>
         </div>
-        {step.fields.map((field) => <NoimFieldComponent field={field} />)}
+        {step.fields.map((field) => (
+          <NoimFieldComponent field={field} />
+        ))}
       </>
-    ) : step.id === 'documents' ? (
+    ) : step.id === "documents" ? (
       <div id="document-checklist">
-        <p style="color:var(--text-muted)">Navigate to this step after filling in your details to see your required documents.</p>
+        <p style="color:var(--text-muted)">
+          Navigate to this step after filling in your details to see your
+          required documents.
+        </p>
       </div>
-    ) : step.id === 'review' ? (
+    ) : step.id === "review" ? (
       <div>
-        {step.fields.map((field) => <NoimFieldComponent field={field} />)}
-        <button type="submit" id="submit-btn-top" style="display:none;width:100%;margin-bottom:1.5rem">Generate my NOIM PDF</button>
-        <div id="form-feedback" style="display:none;margin-bottom:1.5rem;padding:12px 16px;border-radius:3px;font-size:0.92rem"></div>
+        {step.fields.map((field) => (
+          <NoimFieldComponent field={field} />
+        ))}
+        <button
+          type="submit"
+          id="submit-btn-top"
+          style="display:none;width:100%;margin-bottom:1.5rem"
+        >
+          Generate my NOIM PDF
+        </button>
+        <div
+          id="form-feedback"
+          role="status"
+          aria-live="polite"
+          tabindex={-1}
+          style="display:none;margin-bottom:1.5rem;padding:12px 16px;border-radius:3px;font-size:0.92rem"
+        ></div>
+        <section
+          id="completion-next-steps"
+          class="completion-next-steps"
+          hidden
+          aria-labelledby="completion-next-steps-heading"
+        >
+          <h3 id="completion-next-steps-heading">Optional next steps</h3>
+          <p>
+            Your PDF is ready. These links are optional and open
+            separately; they do not send your NOIM details anywhere.
+          </p>
+          <ul>
+            <li>
+              <a
+                href="https://australianmarriageoffices.com.au?utm_source=noim-easy&amp;utm_medium=referral&amp;utm_campaign=completed-noim"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                We only need the legal wedding
+              </a>
+            </li>
+            <li>
+              <a
+                href="https://australianweddingcelebrants.com.au?utm_source=noim-easy&amp;utm_medium=referral&amp;utm_campaign=completed-noim"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Find a good celebrant
+              </a>
+            </li>
+            <li>
+              <a
+                href="https://elopementcollective.com?utm_source=noim-easy&amp;utm_medium=referral&amp;utm_campaign=completed-noim"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Plan an elopement
+              </a>
+            </li>
+            <li>
+              <a
+                href="https://wedding.computer?utm_source=noim-easy&amp;utm_medium=referral&amp;utm_campaign=completed-noim"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Celebrants: manage weddings and NOIMs
+              </a>
+            </li>
+          </ul>
+        </section>
         <div id="review-section">
-          <p style="color:var(--text-muted)">Navigate to this step to review all your details before submitting.</p>
+          <p style="color:var(--text-muted)">
+            Navigate to this step to review all your details before submitting.
+          </p>
         </div>
       </div>
     ) : (
       step.fields.map((field) => <NoimFieldComponent field={field} />)
     )}
   </div>
-)
+);
 
 export const NoimFormPage: FC<{ submitUrl: string }> = ({ submitUrl }) => (
   <html lang="en">
@@ -243,15 +380,24 @@ export const NoimFormPage: FC<{ submitUrl: string }> = ({ submitUrl }) => (
       <meta charset="utf-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1" />
       <title>Prepare your NOIM — NOIM Easy</title>
-      <meta name="description" content="NOIM Easy makes it simple to fill out and prepare your Australian Notice of Intended Marriage (NOIM). Complete the form online, download your PDF, and take it to your celebrant." />
+      <meta
+        name="description"
+        content="NOIM Easy makes it simple to fill out and prepare your Australian Notice of Intended Marriage (NOIM). Complete the form online, download your PDF, and take it to your celebrant."
+      />
       <meta property="og:title" content="Prepare your NOIM — NOIM Easy" />
-      <meta property="og:description" content="This app helps you prepare your Notice of Intended Marriage form accurately, privately, and in about 10 minutes." />
+      <meta
+        property="og:description"
+        content="This app helps you prepare your Notice of Intended Marriage form accurately, privately, and in about 10 minutes."
+      />
       <meta property="og:image" content="https://noimeasy.au/og-image.png" />
       <meta property="og:type" content="website" />
       <meta property="og:url" content="https://noimeasy.au/prepare" />
       <meta name="twitter:card" content="summary_large_image" />
       <meta name="twitter:title" content="Prepare your NOIM — NOIM Easy" />
-      <meta name="twitter:description" content="This app helps you prepare your Notice of Intended Marriage form accurately, privately, and in about 10 minutes." />
+      <meta
+        name="twitter:description"
+        content="This app helps you prepare your Notice of Intended Marriage form accurately, privately, and in about 10 minutes."
+      />
       <meta name="twitter:image" content="https://noimeasy.au/og-image.png" />
       <meta name="color-scheme" content="light dark" />
       <link rel="icon" type="image/png" href="/favicon.png" />
@@ -355,14 +501,22 @@ export const NoimFormPage: FC<{ submitUrl: string }> = ({ submitUrl }) => (
         .step-nav { display: flex; justify-content: space-between; align-items: center; margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--border); }
         .step-nav button { min-width: 120px; border-radius: 3px; }
         #step-indicator { color: var(--text-muted); font-size: 14px; letter-spacing: 0.02em; }
+        #review-section table { table-layout:fixed; width:100%; }
+        #review-section th, #review-section td { overflow-wrap:anywhere; vertical-align:top; }
+        .review-edit { display:block; width:auto; padding:0; margin:0.35rem 0 0; border:0; background:none; color:var(--text); font-size:0.8rem; text-decoration:underline; }
         hgroup { margin-bottom: 1.5rem; }
-        hgroup h3 { color: var(--text); }
+        hgroup h2 { font-size:1.5rem; color: var(--text); }
         fieldset { margin: 0; }
         .dob-age-note { display:none;margin-top:0.4rem;padding:0.65rem 0.75rem;border-radius:3px;line-height:1.45; }
         .dob-age-note.warning { display:block;background:#fff7ed;color:#9a3412;border:1px solid #fed7aa; }
         .dob-age-note.error { display:block;background:var(--error-bg);color:var(--error-text);border:1px solid var(--error-border); }
         .middle-name-hint { display:none; margin-top:4px; font-size:13px; }
         .address-fallback-note { color:var(--text-muted); font-size:13px; margin-top:4px; }
+        .completion-next-steps { margin:0 0 1.5rem; padding:1rem 1.1rem; border-radius:6px; background:var(--surface); box-shadow:0 0 0 1px var(--border); }
+        .completion-next-steps h3 { margin:0 0 0.3rem; font-size:1rem; color:var(--text); text-wrap:balance; }
+        .completion-next-steps p { margin:0 0 0.7rem; color:var(--text-muted); font-size:0.88rem; text-wrap:pretty; }
+        .completion-next-steps ul { display:grid; gap:0.35rem; margin:0; padding-left:1.1rem; }
+        .completion-next-steps a { color:var(--text); font-size:0.9rem; font-weight:600; }
 
         /* Occupation suggestions are loaded lazily to keep the form responsive. */
         .occupation-select { position:relative; }
@@ -433,24 +587,37 @@ export const NoimFormPage: FC<{ submitUrl: string }> = ({ submitUrl }) => (
     <body>
       <div class="site-header">
         <div class="inner">
-          <a href="/"><img src="/logo.svg" alt="NOIM Easy" width="187" height="32" /></a>
+          <a href="/">
+            <img src="/logo.svg" alt="NOIM Easy" width="187" height="32" />
+          </a>
         </div>
       </div>
 
       <main class="container" style="max-width:700px">
         <header style="text-align:center;margin-bottom:2rem">
-          <h2 style="color:var(--text)">Prepare your NOIM</h2>
+          <h1 style="color:var(--text);font-size:2rem">Prepare your NOIM</h1>
           <p style="color:var(--text-muted)">
-            Fill in your details exactly as they should appear on the official form. When you're done,
-            you'll get a completed NOIM PDF to download and sign in the presence of an authorised witness.
+            Fill in your details exactly as they should appear on the official
+            form. When you're done, you'll get a prepared NOIM PDF to download,
+            check and sign in the presence of an authorised witness. Downloading
+            it does not give notice to a celebrant.
           </p>
           <p style="color:var(--text-muted);font-size:0.9rem">
-            Since 12 June 2024, an authorised witness may witness a NOIM in person or remotely by
-            audio-visual link, subject to the location rules explained by the Attorney-General's Department.
+            Since 12 June 2024, an authorised witness may witness a NOIM in
+            person or remotely by audio-visual link, subject to the location
+            rules explained by the Attorney-General's Department.
+          </p>
+          <p style="color:var(--text-muted);font-size:0.9rem">
+            Invisible formatting copied into a field is cleaned automatically.
+            Legal names typed entirely in uppercase or lowercase are changed to
+            title case; names with deliberate mixed capitalisation are left as
+            entered. Check every name against its supporting document in the
+            final review.
           </p>
         </header>
 
-        <form id="noim-form" method="post" action={submitUrl}>
+        <noscript><p>This step-by-step form needs JavaScript. Enable it to continue, or <a href="https://www.ag.gov.au/families-and-marriage/publications/notice-intended-marriage">download the official blank NOIM</a>.</p></noscript>
+        <form id="noim-form" method="post" action={submitUrl} novalidate>
           {noimSteps.map((step, i) => (
             <NoimStepComponent step={step} index={i} />
           ))}
@@ -461,19 +628,31 @@ export const NoimFormPage: FC<{ submitUrl: string }> = ({ submitUrl }) => (
           </div>
 
           <div class="step-nav">
-            <button type="button" id="prev-btn" class="secondary" style="display:none">Previous</button>
+            <button
+              type="button"
+              id="prev-btn"
+              class="secondary"
+              style="display:none"
+            >
+              Previous
+            </button>
             <span id="step-indicator">Step 1 of {noimSteps.length}</span>
-            <button type="button" id="next-btn">Next</button>
-            <button type="submit" id="submit-btn" style="display:none">Generate my NOIM PDF</button>
+            <button type="button" id="next-btn">
+              Next
+            </button>
+            <button type="submit" id="submit-btn" style="display:none">
+              Generate my NOIM PDF
+            </button>
           </div>
         </form>
       </main>
 
       <footer class="site-footer">
-        NOIM Easy is a preparation tool only. It does not constitute legal advice.
+        NOIM Easy is a preparation tool only. It does not constitute legal
+        advice.
       </footer>
 
       <script dangerouslySetInnerHTML={{ __html: getNoimClientScript() }} />
     </body>
   </html>
-)
+);

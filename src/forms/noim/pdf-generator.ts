@@ -7,6 +7,7 @@ import {
 } from './pdf-generator-core'
 
 export { PdfFieldOverflowError, UnsupportedPdfCharacterError }
+export { pdfFieldInputNames } from './pdf-generator-core'
 
 export async function generateNoimPdf(data: Record<string, unknown>): Promise<Uint8Array> {
   return await generateNoimPdfFromAssets(data, noimPdfBytes, unicodeFontBytes)

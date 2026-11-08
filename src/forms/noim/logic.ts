@@ -1,13 +1,22 @@
-import { noimSteps, type NoimCondition } from './schema.ts'
-import { COUNTRIES } from '../shared/countries.ts'
+import { noimSteps, type NoimCondition } from "./schema.ts";
+import { COUNTRIES } from "../shared/countries.ts";
+import { normaliseNoimText } from "./text-normalisation.ts";
+import { formatResidentialAddress } from "./address.ts";
 
 const reviewMetadata = Object.fromEntries(
-  noimSteps.flatMap((step) => step.fields).map((field) => [field.name, {
-    label: field.label,
-    type: field.type,
-    options: Object.fromEntries(field.options?.map((option) => [option.value, option.label]) || []),
-  }]),
-)
+  noimSteps
+    .flatMap((step) => step.fields)
+    .map((field) => [
+      field.name,
+      {
+        label: field.label,
+        type: field.type,
+        options: Object.fromEntries(
+          field.options?.map((option) => [option.value, option.label]) || [],
+        ),
+      },
+    ]),
+);
 
 /**
  * Check if a field should be visible given the current form data.
@@ -15,129 +24,141 @@ const reviewMetadata = Object.fromEntries(
  */
 export function isFieldVisible(
   conditions: NoimCondition[] | undefined,
-  data: Record<string, string>
+  data: Record<string, string>,
 ): boolean {
-  if (!conditions || conditions.length === 0) return true
+  if (!conditions || conditions.length === 0) return true;
 
   return conditions.every((cond) => {
-    const fieldValue = (data[cond.field] || '').toLowerCase().trim()
-    const compareValue = typeof cond.value === 'string'
-      ? cond.value.toLowerCase().trim()
-      : cond.value.map((v) => v.toLowerCase().trim())
+    const fieldValue = (data[cond.field] || "").toLowerCase().trim();
+    const compareValue =
+      typeof cond.value === "string"
+        ? cond.value.toLowerCase().trim()
+        : cond.value.map((v) => v.toLowerCase().trim());
 
     switch (cond.operator) {
-      case 'eq':
-        return fieldValue === compareValue
-      case 'neq':
-        return fieldValue !== '' && fieldValue !== compareValue
-      case 'in':
-        return Array.isArray(compareValue) && compareValue.includes(fieldValue)
+      case "eq":
+        return fieldValue === compareValue;
+      case "neq":
+        return fieldValue !== "" && fieldValue !== compareValue;
+      case "in":
+        return Array.isArray(compareValue) && compareValue.includes(fieldValue);
       default:
-        return true
+        return true;
     }
-  })
+  });
 }
 
 /**
  * Generate a document checklist based on the form data.
  */
 export interface DocumentItem {
-  document: string
-  party: string
-  reason: string
-  required: boolean
+  document: string;
+  party: string;
+  reason: string;
+  required: boolean;
 }
 
-export function ageOnDate(dateOfBirth: string, onDate = new Date()): number | null {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateOfBirth)
-  if (!match) return null
+export function ageOnDate(
+  dateOfBirth: string,
+  onDate = new Date(),
+): number | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateOfBirth);
+  if (!match) return null;
 
-  const [, year, month, day] = match.map(Number)
-  let age = onDate.getUTCFullYear() - year
-  const birthdayHasPassed = onDate.getUTCMonth() + 1 > month
-    || (onDate.getUTCMonth() + 1 === month && onDate.getUTCDate() >= day)
-  if (!birthdayHasPassed) age -= 1
-  return age
+  const [, year, month, day] = match.map(Number);
+  let age = onDate.getUTCFullYear() - year;
+  const birthdayHasPassed =
+    onDate.getUTCMonth() + 1 > month ||
+    (onDate.getUTCMonth() + 1 === month && onDate.getUTCDate() >= day);
+  if (!birthdayHasPassed) age -= 1;
+  return age;
 }
 
 export function generateDocumentChecklist(
   data: Record<string, string>,
   proposedMarriageDate = data.proposed_marriage_date,
 ): DocumentItem[] {
-  const docs: DocumentItem[] = []
-  const assessmentDate = /^\d{4}-\d{2}-\d{2}$/.test(proposedMarriageDate || '')
+  const docs: DocumentItem[] = [];
+  const assessmentDate = /^\d{4}-\d{2}-\d{2}$/.test(proposedMarriageDate || "")
     ? new Date(`${proposedMarriageDate}T12:00:00Z`)
-    : new Date()
+    : new Date();
 
-  for (const prefix of ['p1', 'p2']) {
-    const partyLabel = prefix === 'p1' ? 'Party 1' : 'Party 2'
-    const name = `${data[`${prefix}_first_name`] || ''} ${data[`${prefix}_last_name`] || ''}`.trim() || partyLabel
+  for (const prefix of ["p1", "p2"]) {
+    const partyLabel = prefix === "p1" ? "Party 1" : "Party 2";
+    const name =
+      `${data[`${prefix}_first_name`] || ""} ${data[`${prefix}_last_name`] || ""}`.trim() ||
+      partyLabel;
 
     // Everyone needs identity documents
     docs.push({
-      document: 'Official birth certificate/extract OR Australian or overseas passport',
+      document:
+        "Official birth certificate/extract OR Australian or overseas passport",
       party: name,
-      reason: 'Proof of identity and age',
+      reason: "Proof of identity and age",
       required: true,
-    })
+    });
 
-    const age = ageOnDate(data[`${prefix}_dob`] || '', assessmentDate)
+    const age = ageOnDate(data[`${prefix}_dob`] || "", assessmentDate);
     if (age !== null && age < 18) {
       docs.push({
-        document: age < 16
-          ? 'A person under 16 cannot marry in Australia — contact an authorised celebrant immediately'
-          : 'Under-18 marriage requirements: court approval from a judge or magistrate and parent/guardian consent are required unless that consent is dispensed with; only one party may be under 18',
+        document:
+          age < 16
+            ? "A person under 16 cannot marry in Australia — contact an authorised celebrant immediately"
+            : "Under-18 marriage requirements: court approval from a judge or magistrate and parent/guardian consent are required unless that consent is dispensed with; only one party may be under 18",
         party: name,
         reason: `The entered date of birth indicates this party will be ${age} on the proposed marriage date`,
         required: true,
-      })
+      });
     }
 
     // Conjugal status conditional documents
-    const status = data[`${prefix}_conjugal_status`]
-    if (status === 'divorced') {
+    const status = data[`${prefix}_conjugal_status`];
+    if (status === "divorced") {
       docs.push({
-        document: 'Divorce certificate (not the application or hearing documents)',
+        document:
+          "Divorce certificate (not the application or hearing documents)",
         party: name,
-        reason: 'Proof of dissolution of previous marriage',
+        reason: "Proof of dissolution of previous marriage",
         required: true,
-      })
+      });
     }
-    if (status === 'widowed') {
+    if (status === "widowed") {
       docs.push({
-        document: 'Death certificate of deceased spouse',
+        document: "Death certificate of deceased spouse",
         party: name,
-        reason: 'Proof of termination of previous marriage',
+        reason: "Proof of termination of previous marriage",
         required: true,
-      })
+      });
     }
 
     // Unknown birthplace particulars require the statutory-declaration pathway.
-    const birthCountry = (data[`${prefix}_birth_country`] || '').toLowerCase()
+    const birthCountry = (data[`${prefix}_birth_country`] || "").toLowerCase();
     const birthplaceUnknown = [
       data[`${prefix}_birth_country`],
       data[`${prefix}_birth_city`],
       data[`${prefix}_birth_state`],
       data[`${prefix}_birth_state_international`],
-    ].some((value) => (value || '').trim().toLowerCase() === 'unknown')
+    ].some((value) => (value || "").trim().toLowerCase() === "unknown");
     if (birthplaceUnknown) {
       docs.push({
-        document: 'Statutory declaration explaining that birthplace particulars could not be ascertained after reasonable inquiry',
+        document:
+          "Statutory declaration explaining that birthplace particulars could not be ascertained after reasonable inquiry",
         party: name,
-        reason: 'Birthplace particulars were entered as unknown',
+        reason: "Birthplace particulars were entered as unknown",
         required: true,
-      })
-    } else if (birthCountry && birthCountry !== 'australia') {
+      });
+    } else if (birthCountry && birthCountry !== "australia") {
       docs.push({
-        document: 'Accredited translation of any non-English documents (confirm requirements with your celebrant)',
+        document:
+          "Accredited translation of any non-English documents (confirm requirements with your celebrant)",
         party: name,
         reason: `Born outside Australia (${data[`${prefix}_birth_country`]}) — any documents not in English require translation`,
         required: true,
-      })
+      });
     }
   }
 
-  return docs
+  return docs;
 }
 
 /**
@@ -157,16 +178,29 @@ export function getNoimClientScript(): string {
   var submitBtn = document.getElementById('submit-btn');
   var submitBtnTop = document.getElementById('submit-btn-top');
   var stepIndicator = document.getElementById('step-indicator');
+  var completionNextSteps = document.getElementById('completion-next-steps');
   var proposedMarriageDateInput = form.querySelector('[name="proposed_marriage_date"]');
   var currentStep = 0;
-  var COUNTRIES = ${JSON.stringify(['Unknown', ...COUNTRIES])};
+  var isSubmitting = false;
+  var downloadUrl = null;
+  var COUNTRIES = ${JSON.stringify(["Unknown", ...COUNTRIES])};
+  // Esbuild may add calls to its private __name helper inside the shared
+  // function. The inlined browser copy only needs the functions themselves.
+  var __name = function(target) { return target; };
+  var normaliseNoimText = ${normaliseNoimText.toString()};
+  var formatResidentialAddress = ${formatResidentialAddress.toString()};
   var REVIEW_METADATA = ${JSON.stringify({
-    proposed_marriage_date: { label: 'Proposed marriage date', type: 'date', options: {} },
+    proposed_marriage_date: {
+      label: "Proposed marriage date",
+      type: "date",
+      options: {},
+    },
     ...reviewMetadata,
   })};
 
   // === Step Navigation ===
   function showStep(index) {
+    if (index === steps.length - 1) normaliseFormTextFields();
     steps.forEach(function(s, i) {
       s.style.display = i === index ? 'block' : 'none';
     });
@@ -182,8 +216,10 @@ export function getNoimClientScript(): string {
     window.scrollTo(0, 0);
   }
 
-  function validateCurrentStep() {
-    var step = steps[currentStep];
+  function validateStep(index) {
+    var step = steps[index];
+    normaliseTextFields(step);
+    updateAddressRequirements();
     var visibleFields = step.querySelectorAll('input:not([type=hidden]):not([type=radio]), select, textarea');
     var valid = true;
     var firstInvalid = null;
@@ -224,6 +260,8 @@ export function getNoimClientScript(): string {
     });
 
     if (firstInvalid && typeof firstInvalid.reportValidity === 'function') {
+      if (currentStep !== index) showStep(index);
+      firstInvalid.focus();
       firstInvalid.reportValidity();
     }
     return valid;
@@ -234,7 +272,7 @@ export function getNoimClientScript(): string {
   });
 
   nextBtn.addEventListener('click', function() {
-    if (validateCurrentStep() && currentStep < steps.length - 1) {
+    if (validateStep(currentStep) && currentStep < steps.length - 1) {
       showStep(currentStep + 1);
     }
   });
@@ -250,6 +288,30 @@ export function getNoimClientScript(): string {
     }
     return (el.value || '').trim();
   }
+
+  function isLegalNameFieldName(fieldName) {
+    return /_(?:first_name|last_name|middle_names|parent[12]_(?:current|birth)_name)$/.test(fieldName || '');
+  }
+
+  function normaliseTextField(field) {
+    if (!field || typeof field.value !== 'string') return;
+    field.value = normaliseNoimText(field.value, isLegalNameFieldName(field.name));
+  }
+
+  function normaliseTextFields(root) {
+    root.querySelectorAll('input[type="text"], input[type="email"], textarea').forEach(normaliseTextField);
+  }
+
+  function normaliseFormTextFields() {
+    normaliseTextFields(form);
+  }
+
+  form.addEventListener('blur', function(event) {
+    var field = event.target;
+    if (field && field.matches && field.matches('input[type="text"], input[type="email"], textarea')) {
+      normaliseTextField(field);
+    }
+  }, true);
 
   function ageFromDob(dateOfBirth, assessmentDate) {
     var match = /^(\\d{4})-(\\d{2})-(\\d{2})$/.exec(dateOfBirth);
@@ -325,16 +387,25 @@ export function getNoimClientScript(): string {
     input.addEventListener('change', updateAllDobNotices);
   });
   if (proposedMarriageDateInput) {
-    var localToday = new Date();
-    proposedMarriageDateInput.min = [
-      localToday.getFullYear(),
-      String(localToday.getMonth() + 1).padStart(2, '0'),
-      String(localToday.getDate()).padStart(2, '0')
-    ].join('-');
+    proposedMarriageDateInput.min = calendarDateInTimeZone(new Date(), 'Australia/Melbourne');
     proposedMarriageDateInput.addEventListener('input', updateAllDobNotices);
     proposedMarriageDateInput.addEventListener('change', updateAllDobNotices);
   }
   updateAllDobNotices();
+
+  function updateAddressRequirements() {
+    ['p1', 'p2'].forEach(function(prefix) {
+      var australian = getFieldValue(prefix + '_address_country').toLowerCase() === 'australia';
+      var state = form.querySelector('[name="' + prefix + '_address_state"]');
+      var postcode = form.querySelector('[name="' + prefix + '_address_postcode"]');
+      state.required = australian;
+      postcode.required = australian;
+      postcode.setCustomValidity(australian && postcode.value && !/^\\d{4}$/.test(postcode.value.trim())
+        ? 'An Australian postcode must contain four digits' : '');
+    });
+  }
+  form.addEventListener('input', updateAddressRequirements);
+  form.addEventListener('change', updateAddressRequirements);
 
   // === Conditional field visibility ===
   function updateConditionalFields() {
@@ -385,6 +456,8 @@ export function getNoimClientScript(): string {
     var built = false;
     var activeIndex = -1;
     var visibleOptions = [];
+    var allowedCountries = search.name.endsWith('_address_country')
+      ? COUNTRIES.filter(function(country) { return country !== 'Unknown'; }) : COUNTRIES;
 
     function setExpanded(expanded) {
       search.setAttribute('aria-expanded', expanded ? 'true' : 'false');
@@ -397,7 +470,7 @@ export function getNoimClientScript(): string {
 
     function buildOptions() {
       if (built) return;
-      COUNTRIES.forEach(function(c, index) {
+      allowedCountries.forEach(function(c, index) {
         var opt = document.createElement('button');
         opt.type = 'button';
         opt.className = 'country-option';
@@ -427,8 +500,10 @@ export function getNoimClientScript(): string {
     function selectCountry(option) {
       if (!option) return;
       search.value = option.dataset.value;
+      search.setCustomValidity('');
       setExpanded(false);
       updateConditionalFields();
+      updateAddressRequirements();
     }
 
     function updateActiveOption() {
@@ -480,24 +555,18 @@ export function getNoimClientScript(): string {
       if (opt) selectCountry(opt);
     });
 
+    function validateCountry() {
+      var value = normaliseNoimText(search.value);
+      var match = allowedCountries.find(function(country) { return country.toLowerCase() === value.toLowerCase(); });
+      search.setCustomValidity(value && !match ? 'Choose a country from the list' : '');
+      if (match) search.value = match;
+    }
+    search.addEventListener('input', validateCountry);
     search.addEventListener('blur', function() {
-      setTimeout(function() {
-        setExpanded(false);
-        // Validate: value must match a known country exactly
-        var val = search.value.trim();
-        if (val) {
-          var match = null;
-          for (var i = 0; i < COUNTRIES.length; i++) {
-            if (COUNTRIES[i].toLowerCase() === val.toLowerCase()) { match = COUNTRIES[i]; break; }
-          }
-          if (match) {
-            search.value = match; // normalise casing
-          } else {
-            search.value = ''; // clear invalid entry
-          }
-        }
-        updateConditionalFields();
-      }, 200);
+      validateCountry();
+      setExpanded(false);
+      updateConditionalFields();
+      updateAddressRequirements();
     });
   });
 
@@ -697,18 +766,22 @@ export function getNoimClientScript(): string {
     var container = document.getElementById('review-section');
     if (!container) return;
     var formData = Object.fromEntries(new FormData(form));
+    ['p1', 'p2'].forEach(function(prefix) {
+      var parts = {};
+      ['line1', 'line2', 'suburb', 'city', 'state', 'postcode', 'country'].forEach(function(part) {
+        parts[part] = String(formData[prefix + '_address_' + part] || '');
+      });
+      formData[prefix + '_address'] = formatResidentialAddress(parts);
+    });
     container.innerHTML = '';
 
     var excludeFields = ['_hp'];
     var table = document.createElement('table');
-    table.setAttribute('role', 'grid');
 
     for (var key in formData) {
       if (excludeFields.includes(key) || !formData[key]) continue;
-      // Skip hidden structured address components
-      if (key.match(/_address_(street|suburb|state|postcode)$/)) continue;
-      // Skip the send_copy checkbox from the review table (it's rendered separately)
-      if (key === 'send_copy') continue;
+      // The complete assembled address is reviewed in one row, just as in the PDF.
+      if (/_address_/.test(key)) continue;
       // Skip fields whose parent is hidden
       var fieldEl = form.querySelector('[name="' + key + '"]');
       if (fieldEl) {
@@ -721,9 +794,22 @@ export function getNoimClientScript(): string {
       label = label.charAt(0).toUpperCase() + label.slice(1);
       if (key.startsWith('p1_') && label.indexOf('Party 1') === -1) label = 'Party 1: ' + label;
       if (key.startsWith('p2_') && label.indexOf('Party 2') === -1) label = 'Party 2: ' + label;
-      var labelCell = document.createElement('td');
+      var labelCell = document.createElement('th');
+      labelCell.scope = 'row';
       labelCell.style.fontWeight = '600';
       labelCell.textContent = label;
+      var editField = fieldEl || form.querySelector('[name="' + key + '_line1"]');
+      if (editField) {
+        var editButton = document.createElement('button');
+        editButton.type = 'button';
+        editButton.className = 'review-edit';
+        editButton.textContent = 'Edit';
+        editButton.setAttribute('aria-label', 'Edit ' + label);
+        (function(target) {
+          editButton.addEventListener('click', function() { editFormField(target); });
+        })(editField);
+        labelCell.appendChild(editButton);
+      }
       var valueCell = document.createElement('td');
       var rawReviewValue = String(formData[key]);
       var reviewValue = metadata && metadata.options[rawReviewValue]
@@ -744,12 +830,46 @@ export function getNoimClientScript(): string {
 
   var formFeedback = document.getElementById('form-feedback');
 
+  function editFormField(field) {
+    if (isSubmitting) return;
+    var index = Array.from(steps).indexOf(field.closest('.noim-step'));
+    if (index >= 0) showStep(index);
+    field.focus();
+    field.scrollIntoView({ block: 'center' });
+  }
+
+  function clearCompletion() {
+    if (downloadUrl) {
+      URL.revokeObjectURL(downloadUrl);
+      downloadUrl = null;
+      formFeedback.style.display = 'none';
+    }
+    if (completionNextSteps) completionNextSteps.hidden = true;
+  }
+  form.addEventListener('input', clearCompletion);
+  form.addEventListener('change', clearCompletion);
+  window.addEventListener('pagehide', clearCompletion);
+
   // === Form submission via fetch ===
   form.addEventListener('submit', function(e) {
     e.preventDefault();
+    if (isSubmitting) return;
+    if (currentStep < steps.length - 1) {
+      if (validateStep(currentStep)) showStep(currentStep + 1);
+      return;
+    }
+    for (var index = 0; index < steps.length; index++) {
+      if (!validateStep(index)) return;
+    }
+    normaliseFormTextFields();
+    buildReviewSection();
     var formData = new FormData(form);
     var btn = submitBtnTop;
     var originalText = btn.textContent;
+    clearCompletion();
+    isSubmitting = true;
+    prevBtn.disabled = true;
+    nextBtn.disabled = true;
     btn.disabled = true;
     btn.setAttribute('aria-busy', 'true');
     btn.textContent = 'Generating PDF…';
@@ -767,7 +887,9 @@ export function getNoimClientScript(): string {
             var result = JSON.parse(text);
             message = result.error || '';
           } catch (error) {}
-          throw new Error(message || 'PDF generation failed');
+          var failure = new Error(message || 'PDF generation failed');
+          failure.fields = result && result.fields ? result.fields : {};
+          throw failure;
         });
       }
       var contentType = res.headers.get('Content-Type') || '';
@@ -776,31 +898,40 @@ export function getNoimClientScript(): string {
       }
       return res.blob().then(function(blob) {
         // Trigger download
-        var url = URL.createObjectURL(blob);
+        downloadUrl = URL.createObjectURL(blob);
         var disposition = res.headers.get('Content-Disposition') || '';
         var match = disposition.match(/filename="?([^"]+)"?/);
         var filename = match ? match[1] : 'NOIM.pdf';
         var a = document.createElement('a');
-        a.href = url;
+        a.href = downloadUrl;
         a.download = filename;
         document.body.appendChild(a);
         a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        a.textContent = 'Download your PDF again';
+        a.style.display = 'block';
+        formFeedback.replaceChildren(a);
       });
     })
     .then(function() {
       btn.disabled = false;
+      isSubmitting = false;
+      prevBtn.disabled = false;
+      nextBtn.disabled = false;
       btn.removeAttribute('aria-busy');
       btn.textContent = originalText;
       formFeedback.style.display = 'block';
       formFeedback.style.background = 'var(--success-bg)';
       formFeedback.style.color = 'var(--success-text)';
       formFeedback.style.border = '1px solid var(--success-border)';
-      formFeedback.textContent = 'Your NOIM PDF has been downloaded. Review it carefully before signing.';
+      formFeedback.prepend(document.createTextNode('Your prepared NOIM PDF is ready and the download has started. It is not legal notice yet: check it, sign under an authorised witness’s observation, then give it to your celebrant. '));
+      formFeedback.focus();
+      if (completionNextSteps) completionNextSteps.hidden = false;
     })
     .catch(function(err) {
       btn.disabled = false;
+      isSubmitting = false;
+      prevBtn.disabled = false;
+      nextBtn.disabled = false;
       btn.removeAttribute('aria-busy');
       btn.textContent = originalText;
       formFeedback.style.display = 'block';
@@ -808,12 +939,28 @@ export function getNoimClientScript(): string {
       formFeedback.style.color = 'var(--error-text)';
       formFeedback.style.border = '1px solid var(--error-border)';
       formFeedback.textContent = err && err.message ? err.message : 'Something went wrong. Please try again.';
-      console.error('Submit error:', err);
+      var firstField = null;
+      Object.keys(err.fields || {}).forEach(function(name) {
+        var field = form.elements.namedItem(name);
+        if (field && field.setAttribute) {
+          field.setAttribute('aria-invalid', 'true');
+          if (!firstField) firstField = field;
+        }
+      });
+      if (firstField) {
+        var edit = document.createElement('button');
+        edit.type = 'button';
+        edit.className = 'review-edit';
+        edit.textContent = 'Edit the affected details';
+        edit.addEventListener('click', function() { editFormField(firstField); });
+        formFeedback.appendChild(edit);
+      }
+      formFeedback.focus();
     });
   });
 
   // Initialize
   showStep(0);
 })();
-`
+`;
 }

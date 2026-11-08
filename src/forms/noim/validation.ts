@@ -1,6 +1,8 @@
 import { COUNTRIES } from '../shared/countries.ts'
 import { ageOnDate, isFieldVisible } from './logic.ts'
 import { noimSteps, type NoimField } from './schema.ts'
+import { normaliseNoimText } from './text-normalisation.ts'
+import { formatResidentialAddress } from './address.ts'
 
 export interface NoimValidationResult {
   valid: boolean
@@ -16,9 +18,9 @@ const addressParts = [
   { key: 'line1', label: 'Street address', required: true, maxLength: 300 },
   { key: 'line2', label: 'Apartment, unit, level or building', required: false, maxLength: 160 },
   { key: 'suburb', label: 'Suburb or locality', required: true, maxLength: 160 },
-  { key: 'city', label: 'City or town', required: true, maxLength: 160 },
-  { key: 'state', label: 'State, territory or province', required: true, maxLength: 160 },
-  { key: 'postcode', label: 'Postcode or ZIP code', required: true, maxLength: 32 },
+  { key: 'city', label: 'City or town', required: false, maxLength: 160 },
+  { key: 'state', label: 'State, territory or province', required: false, maxLength: 160 },
+  { key: 'postcode', label: 'Postcode or ZIP code', required: false, maxLength: 32 },
   { key: 'country', label: 'Country', required: true, maxLength: 160 },
 ] as const
 
@@ -78,7 +80,7 @@ function collectResidentialAddress(
       continue
     }
 
-    const value = rawValue.trim()
+    const value = normaliseNoimText(rawValue)
     parts[part.key] = value
     if (part.required && !value) {
       errors[inputKey] = `${part.label} is required`
@@ -89,22 +91,21 @@ function collectResidentialAddress(
       errors[inputKey] = `${part.label} is too long`
       continue
     }
-    if (/[\u0000-\u001f\u007f]/u.test(value)) {
-      errors[inputKey] = `${part.label} contains an unsupported control character`
-      continue
-    }
     if (part.key === 'country' && !countrySet.has(value)) {
       errors[inputKey] = 'Country must be selected from the country list'
     }
   }
 
-  data[field.name] = [
-    parts.line1,
-    parts.line2,
-    [parts.suburb, parts.city].filter(Boolean).join(', '),
-    [parts.state, parts.postcode].filter(Boolean).join(' '),
-    parts.country,
-  ].filter(Boolean).join('\n')
+  if (parts.country === 'Australia') {
+    for (const key of ['state', 'postcode']) {
+      if (!parts[key]) errors[`${field.name}_${key}`] = `${key === 'state' ? 'State or territory' : 'Postcode'} is required for an Australian address`
+    }
+    if (parts.postcode && !/^\d{4}$/.test(parts.postcode)) {
+      errors[`${field.name}_postcode`] = 'An Australian postcode must contain four digits'
+    }
+  }
+
+  data[field.name] = formatResidentialAddress(parts)
 }
 
 export function validateNoimSubmission(input: Record<string, unknown>): NoimValidationResult {
@@ -133,7 +134,7 @@ export function validateNoimSubmission(input: Record<string, unknown>): NoimVali
       data[field.name] = ''
       continue
     }
-    data[field.name] = rawValue.trim()
+    data[field.name] = normaliseNoimText(rawValue, isLegalNameField(field.name))
   }
 
   for (const field of fields) {
@@ -157,10 +158,6 @@ export function validateNoimSubmission(input: Record<string, unknown>): NoimVali
 
     if (value.length > maxLength(field)) {
       errors[field.name] = `${field.label} is too long`
-      continue
-    }
-    if (/[\u0000-\u001f\u007f]/u.test(value)) {
-      errors[field.name] = `${field.label} contains an unsupported control character`
       continue
     }
     if (isLegalNameField(field.name)

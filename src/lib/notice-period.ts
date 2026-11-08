@@ -1,11 +1,11 @@
 export interface NoticeWindow {
-  received: string
-  earliestMarriage: string
-  latestMarriage: string
-  nextMonthHasCorrespondingDay: boolean
+  received: string;
+  earliestMarriage: string;
+  latestMarriage: string;
+  nextMonthHasCorrespondingDay: boolean;
 }
 
-export const NOTICE_PERIOD_EMBED_PATH = '/embed/notice-period'
+export const NOTICE_PERIOD_EMBED_PATH = "/embed/notice-period";
 
 export const NOTICE_PERIOD_EMBED_CODE = `<div style="max-width: 700px; margin: 0 auto;">
   <iframe
@@ -14,13 +14,12 @@ export const NOTICE_PERIOD_EMBED_CODE = `<div style="max-width: 700px; margin: 0
     loading="lazy"
     style="display: block; width: 100%; height: 640px; border: 0; border-radius: 14px; background: #fafafa;"
   ></iframe>
-  <p style="margin: 10px 0 0; color: #595959; font: 13px/1.5 system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; text-align: center;">
-    Provided by <a href="https://noimeasy.au/" target="_blank" rel="noopener noreferrer" style="color: inherit !important; text-decoration: none !important;">NOIM Easy</a> to help <a href="https://marriedbyjosh.com/" target="_blank" rel="noopener noreferrer" style="color: inherit !important; text-decoration: none !important;">celebrants</a>.
-  </p>
 </div>
 <script>
   (function (script) {
-    var frame = script.previousElementSibling.querySelector('iframe');
+    var container = script.previousElementSibling;
+    var frame = container && container.querySelector('iframe');
+    if (!frame) return;
     window.addEventListener('message', function (event) {
       if (event.origin !== 'https://noimeasy.au' || event.source !== frame.contentWindow) return;
       if (!event.data || event.data.type !== 'noim-easy:resize') return;
@@ -28,75 +27,106 @@ export const NOTICE_PERIOD_EMBED_CODE = `<div style="max-width: 700px; margin: 0
       if (Number.isFinite(height) && height >= 360 && height <= 900) frame.style.height = Math.ceil(height) + 'px';
     });
   })(document.currentScript);
-</script>`
+</script>`;
 
-interface DateParts {
-  year: number
-  monthIndex: number
-  day: number
-}
-
-function parseDateOnly(value: string): DateParts | null {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
-  if (!match) return null
-
-  const year = Number(match[1])
-  const monthIndex = Number(match[2]) - 1
-  const day = Number(match[3])
-  const date = new Date(Date.UTC(year, monthIndex, day))
-  if (date.getUTCFullYear() !== year
-    || date.getUTCMonth() !== monthIndex
-    || date.getUTCDate() !== day) return null
-
-  return { year, monthIndex, day }
-}
-
-function targetMonth(year: number, monthIndex: number, monthsToAdd: number) {
-  const date = new Date(Date.UTC(year, monthIndex + monthsToAdd, 1))
-  return { year: date.getUTCFullYear(), monthIndex: date.getUTCMonth() }
-}
-
-function daysInMonth(year: number, monthIndex: number): number {
-  return new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate()
-}
-
-function isoDate(year: number, monthIndex: number, day: number): string {
-  return [
-    String(year).padStart(4, '0'),
-    String(monthIndex + 1).padStart(2, '0'),
-    String(day).padStart(2, '0'),
-  ].join('-')
-}
+export const NOTICE_PERIOD_EMBED_ATTRIBUTION = `<p style="margin: 10px 0 0; color: #595959; font: 13px/1.5 system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; text-align: center;">
+  <a href="https://noimeasy.au/" target="_blank" rel="noopener noreferrer" style="color: inherit !important; text-decoration: none !important;">NOIM Easy notice-period calculator</a>
+</p>`;
 
 /**
  * Calculates the ordinary section 42 notice window using the statutory
- * definition of a month in section 2G of the Acts Interpretation Act 1901.
+ * definition of a month in section 2G of the Acts Interpretation Act 1901:
+ * the period ends immediately before the corresponding day in the next
+ * calendar month, or at the end of that month if the day does not exist.
+ *
+ * The function deliberately contains all calendar arithmetic it needs so the
+ * exact same implementation can be shipped in the browser calculator.
  */
-export function calculateNoticeWindow(receivedDate: string): NoticeWindow | null {
-  const received = parseDateOnly(receivedDate)
-  if (!received) return null
-
-  const next = targetMonth(received.year, received.monthIndex, 1)
-  const nextMonthDays = daysInMonth(next.year, next.monthIndex)
-  const nextMonthHasCorrespondingDay = received.day <= nextMonthDays
-
-  let earliestMarriage: string
-  if (nextMonthHasCorrespondingDay) {
-    earliestMarriage = isoDate(next.year, next.monthIndex, received.day)
-  } else {
-    const followingMonth = targetMonth(received.year, received.monthIndex, 2)
-    earliestMarriage = isoDate(followingMonth.year, followingMonth.monthIndex, 1)
+export function calculateNoticeWindow(
+  receivedDate: string,
+): NoticeWindow | null {
+  function isLeapYear(year: number): boolean {
+    return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
   }
 
-  const expiryMonth = targetMonth(received.year, received.monthIndex, 18)
-  const latestDay = Math.min(received.day, daysInMonth(expiryMonth.year, expiryMonth.monthIndex))
+  function daysInMonth(year: number, month: number): number {
+    const days = [
+      31,
+      isLeapYear(year) ? 29 : 28,
+      31,
+      30,
+      31,
+      30,
+      31,
+      31,
+      30,
+      31,
+      30,
+      31,
+    ];
+    return days[month - 1] ?? 0;
+  }
+
+  function addCalendarMonths(year: number, month: number, months: number) {
+    const absoluteMonth = year * 12 + (month - 1) + months;
+    return {
+      year: Math.floor(absoluteMonth / 12),
+      month: (absoluteMonth % 12) + 1,
+    };
+  }
+
+  function isoDate(year: number, month: number, day: number): string {
+    return [
+      String(year).padStart(4, "0"),
+      String(month).padStart(2, "0"),
+      String(day).padStart(2, "0"),
+    ].join("-");
+  }
+
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(receivedDate);
+  if (!match) return null;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (
+    year < 1 ||
+    month < 1 ||
+    month > 12 ||
+    day < 1 ||
+    day > daysInMonth(year, month)
+  ) {
+    return null;
+  }
+
+  const next = addCalendarMonths(year, month, 1);
+  const nextMonthHasCorrespondingDay =
+    day <= daysInMonth(next.year, next.month);
+
+  let earliestMarriage: string;
+  if (nextMonthHasCorrespondingDay) {
+    earliestMarriage = isoDate(next.year, next.month, day);
+  } else {
+    const followingMonth = addCalendarMonths(year, month, 2);
+    earliestMarriage = isoDate(followingMonth.year, followingMonth.month, 1);
+  }
+
+  const expiryMonth = addCalendarMonths(year, month, 18);
+  const latestDay = Math.min(
+    day,
+    daysInMonth(expiryMonth.year, expiryMonth.month),
+  );
 
   return {
     received: receivedDate,
     earliestMarriage,
-    latestMarriage: isoDate(expiryMonth.year, expiryMonth.monthIndex, latestDay),
+    latestMarriage: isoDate(
+      expiryMonth.year,
+      expiryMonth.month,
+      latestDay,
+    ),
     nextMonthHasCorrespondingDay,
-  }
+  };
 }
 
 export function getNoticePeriodCalculatorScript(): string {
@@ -109,28 +139,15 @@ export function getNoticePeriodCalculatorScript(): string {
   var explanation = document.getElementById('notice-period-explanation');
   if (!input || !receivedOutput || !earliestOutput || !latestOutput || !explanation) return;
 
-  function parseDateOnly(value) {
-    var match = /^(\\d{4})-(\\d{2})-(\\d{2})$/.exec(value);
-    if (!match) return null;
-    var year = Number(match[1]);
-    var monthIndex = Number(match[2]) - 1;
-    var day = Number(match[3]);
-    var date = new Date(Date.UTC(year, monthIndex, day));
-    if (date.getUTCFullYear() !== year || date.getUTCMonth() !== monthIndex || date.getUTCDate() !== day) return null;
-    return { year: year, monthIndex: monthIndex, day: day };
-  }
+  // Esbuild may preserve nested function names with calls to its private
+  // __name helper when this shared function is bundled for the Worker. The
+  // inlined browser copy only needs the functions themselves.
+  var __name = function(target) { return target; };
+  var calculateNoticeWindow = ${calculateNoticeWindow.toString()};
 
-  function targetMonth(parts, monthsToAdd) {
-    var date = new Date(Date.UTC(parts.year, parts.monthIndex + monthsToAdd, 1));
-    return { year: date.getUTCFullYear(), monthIndex: date.getUTCMonth() };
-  }
-
-  function daysInMonth(year, monthIndex) {
-    return new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
-  }
-
-  function dateFromParts(parts, day) {
-    return new Date(Date.UTC(parts.year, parts.monthIndex, day, 12));
+  function dateFromIso(value) {
+    var parts = value.split('-').map(Number);
+    return new Date(Date.UTC(parts[0], parts[1] - 1, parts[2], 12));
   }
 
   function formatDate(date) {
@@ -140,8 +157,8 @@ export function getNoticePeriodCalculatorScript(): string {
   }
 
   function updateNoticeWindow() {
-    var received = parseDateOnly(input.value);
-    if (!received) {
+    var noticeWindow = calculateNoticeWindow(input.value);
+    if (!noticeWindow) {
       receivedOutput.textContent = 'Choose a valid date';
       earliestOutput.textContent = '—';
       latestOutput.textContent = '—';
@@ -149,29 +166,22 @@ export function getNoticePeriodCalculatorScript(): string {
       return;
     }
 
-    var receivedDate = dateFromParts(received, received.day);
-    var next = targetMonth(received, 1);
-    var nextDays = daysInMonth(next.year, next.monthIndex);
-    var hasCorrespondingDay = received.day <= nextDays;
-    var earliestDate;
+    var receivedDate = dateFromIso(noticeWindow.received);
+    var earliestDate = dateFromIso(noticeWindow.earliestMarriage);
+    var latestDate = dateFromIso(noticeWindow.latestMarriage);
+    var receivedDay = receivedDate.getUTCDate();
+    var nextMonthDate = new Date(Date.UTC(receivedDate.getUTCFullYear(), receivedDate.getUTCMonth() + 1, 1, 12));
+    var nextMonthName = new Intl.DateTimeFormat('en-AU', { month: 'long', timeZone: 'UTC' }).format(nextMonthDate);
+    var earliestLabel = formatDate(earliestDate);
 
-    if (hasCorrespondingDay) {
-      earliestDate = dateFromParts(next, received.day);
-      explanation.textContent = 'The corresponding day exists in the following calendar month.';
+    if (noticeWindow.nextMonthHasCorrespondingDay) {
+      explanation.textContent = nextMonthName + ' has a day ' + receivedDay + '. The statutory month ends immediately before ' + earliestLabel + ', so marriage may take place on that date.';
     } else {
-      var following = targetMonth(received, 2);
-      earliestDate = dateFromParts(following, 1);
-      var nextMonthName = new Intl.DateTimeFormat('en-AU', { month: 'long', timeZone: 'UTC' })
-        .format(dateFromParts(next, 1));
-      explanation.textContent = nextMonthName + ' has no day ' + received.day + ', so the legal month runs to the end of ' + nextMonthName + ' and the first marriage date is the following day.';
+      explanation.textContent = nextMonthName + ' has no day ' + receivedDay + '. The statutory month ends at the end of ' + nextMonthName + ', so marriage may take place from ' + earliestLabel + '.';
     }
 
-    var expiry = targetMonth(received, 18);
-    var latestDay = Math.min(received.day, daysInMonth(expiry.year, expiry.monthIndex));
-    var latestDate = dateFromParts(expiry, latestDay);
-
     receivedOutput.textContent = formatDate(receivedDate);
-    earliestOutput.textContent = formatDate(earliestDate);
+    earliestOutput.textContent = earliestLabel;
     latestOutput.textContent = formatDate(latestDate);
   }
 
@@ -187,7 +197,7 @@ export function getNoticePeriodCalculatorScript(): string {
   input.addEventListener('change', updateNoticeWindow);
   updateNoticeWindow();
 })();
-`
+`;
 }
 
 export function getNoticePeriodEmbedCopyScript(): string {
@@ -230,7 +240,7 @@ export function getNoticePeriodEmbedCopyScript(): string {
     }
   });
 })();
-`
+`;
 }
 
 export function getNoticePeriodEmbedResizeScript(): string {
@@ -247,5 +257,5 @@ export function getNoticePeriodEmbedResizeScript(): string {
   }
   sendHeight();
 })();
-`
+`;
 }

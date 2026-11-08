@@ -32,20 +32,22 @@ The calculator in `src/lib/notice-period.ts` applies the definition of a month i
 
 - If the following month has a corresponding numbered day, that is the first ordinary marriage date. For example, notice received on 5 January 2026 produces 5 February 2026.
 - If the following month has no corresponding day, the statutory month runs to the end of that month and the first marriage date is the following day. For example, notice received on 31 January 2026 produces 1 March 2026—not 28 February.
+- A date falling on the 31st does not automatically roll into the month after next. Notice received on 31 July produces 31 August because August has a corresponding day 31. Notice received on 31 August produces 1 October because September has no day 31.
 - Leap years are calculated rather than approximated as a fixed number of days.
 - The calculator also displays the final date in the ordinary 18-month window.
 - It does not assume that a prescribed authority has approved a shortening of time; the celebrant remains responsible for confirming the final date.
 
-The date logic is implemented as a dependency-free server helper and mirrored in the browser script. Both paths are covered by tests for corresponding-day, missing-day, invalid-date, and leap-year cases.
+The date logic is implemented as one dependency-free helper used by both the server and the browser script. Tests cover every date in a full 400-year Gregorian cycle, execute the browser calculator at month-end and leap-year boundaries, and exercise the copied iframe resize code.
 
 ### Embedding the calculator
 
-The homepage disclosure labelled **Embed this calculator on your website** provides a ready-to-copy snippet for celebrants and other publishers. The snippet contains:
+The homepage disclosure labelled **Embed this calculator on your website** provides a ready-to-copy snippet for celebrants, venues and other publishers. The snippet contains:
 
 - a responsive iframe pointing to `https://noimeasy.au/embed/notice-period`, with a small origin-checked resize listener so the frame fits its content;
 - an accessible iframe title and lazy loading;
-- a separate attribution line reading “Provided by NOIM Easy to help celebrants”;
-- visually neutral links from `NOIM Easy` to `noimeasy.au` and from `celebrants` to `marriedbyjosh.com`.
+- an optional, small and visually neutral attribution link to `noimeasy.au`.
+
+Paste the iframe and resize script into a page or HTML block. The calculator works without the attribution; it never requires an account, a lead form or contact details. It is a timing aid only—it does not prepare, receive or lodge a couple’s NOIM.
 
 The iframe endpoint contains only the branded calculator and its legal explanation. It does not load analytics or make any external data request. Its response permits framing, disables indexing, restricts its content sources, and opens legislation and branding links outside the frame.
 
@@ -58,7 +60,7 @@ The iframe endpoint contains only the branded calculator and its legal explanati
 - If a person has no family name, the official family-name item is left blank. A dash is never inserted as a substitute.
 - Dashes, punctuation-only strings, `N/A`, `none`, `null`, and `unknown` are rejected in party-name fields.
 - All given names can be entered separately as the first given name and additional given names.
-- Legal-name casing is preserved rather than automatically title-cased.
+- Legal names entered entirely in uppercase or lowercase are title-cased; deliberately mixed casing is preserved. Pasted invisible formatting is removed, and users must check names against their supporting documents.
 
 ### Dates of birth and proposed marriage date
 
@@ -84,8 +86,9 @@ The iframe endpoint contains only the branded calculator and its legal explanati
 
 ### Residential addresses
 
-- Each party supplies street address, optional unit/building details, suburb/locality, city/town, state/territory/province, postcode/ZIP code, and country.
-- The server validates and assembles those parts into the official PDF address field. They are not sent to a third-party address-lookup service.
+- Each party supplies a street address, suburb/locality/town and country, with optional unit/building details and a separate city if different. State and a four-digit postcode are required for Australia; international state/province and postcode fields are optional where not applicable.
+- A shared formatter assembles the complete address for both review and the official PDF. The PDF wraps the text to its available width rather than forcing every component onto a separate line. Identical locality/city entries are included once. No necessary detail is truncated or discarded, and addresses are not sent to a third-party lookup service.
+- Review rows provide Edit links. Server validation and PDF layout errors link back to the affected inputs without clearing the other answers.
 
 ### Conjugal status and previous marriages
 
@@ -100,7 +103,7 @@ The review page displays the official labels rather than internal storage codes.
 
 ### Witnessing
 
-The site reflects the current section 42 witness categories and explains remote witnessing. In Australia, the listed witnesses include an authorised celebrant, a Commissioner for Declarations under the *Statutory Declarations Act 1959*, a Justice of the Peace, a barrister or solicitor, a medical practitioner, and an Australian Federal Police or state/territory police member. The site separately lists the permitted overseas categories and location rule.
+The site reflects the current section 42 witness categories and explains remote witnessing. In Australia, the listed witnesses include an authorised celebrant, a Commissioner for Declarations under the _Statutory Declarations Act 1959_, a Justice of the Peace, a barrister or solicitor, a medical practitioner, and an Australian Federal Police or state/territory police member. The site separately lists the permitted overseas categories and location rule.
 
 The bundled official PDF contains older physical-presence wording. The application leaves the official template unchanged and displays the current rule separately.
 
@@ -122,8 +125,9 @@ The application intentionally has no database, KV namespace, object store, user 
 - Submitted particulars are held in Worker memory only while the request is validated and the PDF is generated.
 - Application code does not persist or deliberately log form fields.
 - The generated PDF is returned directly and is not retained by the application.
+- Answers and the retry-download link remain in the current browser page's memory; the application does not use browser storage. The application does not save that state for a later visit.
 - Identity documents are never uploaded.
-- PDF responses use `Cache-Control: no-store`.
+- HTML and submission responses use `Cache-Control: no-store, no-transform`. The latter prevents Cloudflare's automatic analytics injection; CSP also blocks external scripts. Recheck the deployed browser network requests after changing Cloudflare settings.
 
 Operators should still understand that Cloudflare and upstream network providers process ordinary connection metadata as part of serving requests. The application-level privacy promises above do not redefine those providers' independent infrastructure policies.
 
@@ -142,14 +146,14 @@ Operators should still understand that Cloudflare and upstream network providers
 
 ## Routes
 
-| Method | Path | Purpose |
-| --- | --- | --- |
-| `GET` | `/` | Landing page, legal process explainer, and notice calculator |
-| `GET` | `/prepare` | Multi-step NOIM preparation form |
-| `GET` | `/embed/notice-period` | Standalone branded notice-period calculator for iframe embeds |
-| `POST` | `/submit` | Validate particulars and return the completed PDF |
-| `GET` | `/occupations.txt` | Bundled occupation suggestions |
-| `GET` | `/logo.svg`, `/favicon.png`, `/og-image.png`, `/pico.min.css` | Self-hosted static assets |
+| Method | Path                                                          | Purpose                                                       |
+| ------ | ------------------------------------------------------------- | ------------------------------------------------------------- |
+| `GET`  | `/`                                                           | Landing page, legal process explainer, and notice calculator  |
+| `GET`  | `/prepare`                                                    | Multi-step NOIM preparation form                              |
+| `GET`  | `/embed/notice-period`                                        | Standalone branded notice-period calculator for iframe embeds |
+| `POST` | `/submit`                                                     | Validate particulars and return the completed PDF             |
+| `GET`  | `/occupations.txt`                                            | Bundled occupation suggestions                                |
+| `GET`  | `/logo.svg`, `/favicon.png`, `/og-image.png`, `/pico.min.css` | Self-hosted static assets                                     |
 
 ## Technology
 
@@ -189,6 +193,15 @@ Run the complete release gate before committing or deploying:
 ```sh
 npm run check
 ```
+
+Run browser regression tests before releasing form changes:
+
+```sh
+npx playwright install chromium firefox webkit
+npm run test:browser
+```
+
+The suite starts a local Worker and checks seven-step completion, full address review/editing, actual PDF downloads and repeat downloads, no-family-name and overseas cases, validation recovery, failed-request retries, calculator boundaries, request privacy and rate limits in Chromium, Firefox and mobile WebKit. It uses synthetic particulars only.
 
 That command runs:
 

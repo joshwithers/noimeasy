@@ -1,114 +1,196 @@
-import { Hono } from 'hono'
-import type { Env } from './types'
-import { NoimFormPage } from './forms/noim/index'
-import { markdownToHtml } from './landing'
-import { generateNoimPdf, PdfFieldOverflowError, UnsupportedPdfCharacterError } from './forms/noim/pdf-generator'
-import { safePdfFilename, validateNoimSubmission } from './forms/noim/validation'
+import { Hono } from "hono";
+import type { Env } from "./types";
+import { NoimFormPage } from "./forms/noim/index";
+import { markdownToHtml } from "./landing";
+import {
+  generateNoimPdf,
+  PdfFieldOverflowError,
+  UnsupportedPdfCharacterError,
+  pdfFieldInputNames,
+} from "./forms/noim/pdf-generator";
+import {
+  safePdfFilename,
+  validateNoimSubmission,
+} from "./forms/noim/validation";
 import {
   FormBodyTooLargeError,
   formRequestRejection,
   parseFormBodyWithLimit,
-} from './lib/form-request'
+} from "./lib/form-request";
 import {
   getNoticePeriodCalculatorScript,
   getNoticePeriodEmbedCopyScript,
   getNoticePeriodEmbedResizeScript,
+  NOTICE_PERIOD_EMBED_ATTRIBUTION,
   NOTICE_PERIOD_EMBED_CODE,
   NOTICE_PERIOD_EMBED_PATH,
-} from './lib/notice-period'
-import landingMd from '../content/landing.md'
-import logoSvg from '../content/logo.svg'
-import faviconPng from '../content/favicon.png'
-import ogImagePng from '../content/og-image.png'
-import picoCss from '../content/pico.min.css'
-import occupationsText from './forms/noim/occupations.txt'
+} from "./lib/notice-period";
+import landingMd from "../content/landing.md";
+import logoSvg from "../content/logo.svg";
+import faviconPng from "../content/favicon.png";
+import ogImagePng from "../content/og-image.png";
+import picoCss from "../content/pico.min.css";
+import occupationsText from "./forms/noim/occupations.txt";
 
-const app = new Hono<Env>()
+const app = new Hono<Env>();
+
+// Prevent edge-injected analytics and keep all form/PDF responses private.
+app.use('*', async (c, next) => {
+  await next();
+  c.header('X-Content-Type-Options', 'nosniff');
+  c.header('Referrer-Policy', 'no-referrer');
+  if (c.req.path === '/submit') c.header('Cache-Control', 'no-store, no-transform');
+  if (c.res.headers.get('Content-Type')?.includes('text/html')) {
+    c.header('Cache-Control', 'no-store, no-transform');
+    if (c.req.path !== NOTICE_PERIOD_EMBED_PATH) {
+      c.header('Content-Security-Policy', "default-src 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'");
+    }
+  }
+});
+
+app.onError(() => {
+  // Never log request bodies, particulars, or errors that could contain them.
+  return new Response(JSON.stringify({ ok: false, error: 'Unable to generate the PDF right now. Your entries are still in the form. Please try again.' }), {
+    status: 500,
+    headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store, no-transform' },
+  });
+});
 
 function NoticePeriodCalculator({ embedded = false }: { embedded?: boolean }) {
-  const linkTarget = embedded ? '_blank' : undefined
-  const linkRel = embedded ? 'noopener noreferrer' : undefined
+  const linkTarget = embedded ? "_blank" : undefined;
+  const linkRel = embedded ? "noopener noreferrer" : undefined;
 
-  return <section class="notice-calculator" aria-labelledby="notice-calculator-heading">
-    <h2 id="notice-calculator-heading">When can you get married?</h2>
-    <p>Choose the date your celebrant receives the completed and signed NOIM.</p>
-    <label class="notice-date-label" for="notice-received-date">Date received by celebrant</label>
-    <input type="date" id="notice-received-date" aria-describedby="notice-rule-note" />
+  return (
+    <section
+      class="notice-calculator"
+      aria-labelledby="notice-calculator-heading"
+    >
+      <h2 id="notice-calculator-heading">When can you get married?</h2>
+      <p>
+        Choose the date your celebrant receives the completed and signed NOIM.
+      </p>
+      <label class="notice-date-label" for="notice-received-date">
+        Date received by celebrant
+      </label>
+      <input
+        type="date"
+        id="notice-received-date"
+        aria-describedby="notice-rule-note"
+      />
 
-    <div class="notice-window" aria-live="polite">
-      <div class="notice-result">
-        <span class="notice-result-label">Earliest marriage date</span>
-        <strong id="earliest-marriage-output">—</strong>
+      <div class="notice-window" aria-live="polite">
+        <div class="notice-result">
+          <span class="notice-result-label">Earliest marriage date</span>
+          <strong id="earliest-marriage-output">—</strong>
+        </div>
+        <div class="notice-result">
+          <span class="notice-result-label">Notice valid through</span>
+          <strong id="latest-marriage-output">—</strong>
+        </div>
       </div>
-      <div class="notice-result">
-        <span class="notice-result-label">Notice valid through</span>
-        <strong id="latest-marriage-output">—</strong>
-      </div>
-    </div>
-    <p class="notice-received-summary">Calculated from receipt on <strong id="notice-received-output">—</strong>.</p>
-    <p id="notice-period-explanation"></p>
-    <p class="notice-rule" id="notice-rule-note">
-      This applies the calendar-month rule in section 2G of the
-      {' '}<a href="https://www.legislation.gov.au/Current/C1901A00002" target={linkTarget} rel={linkRel}>Acts Interpretation Act 1901</a>
-      {' '}to the one-to-18-month window in section 42 of the
-      {' '}<a href="https://www.legislation.gov.au/Current/C1961A00012" target={linkTarget} rel={linkRel}>Marriage Act 1961</a>.
-      It assumes no prescribed authority has approved a shorter notice period. Your celebrant must confirm the final dates.
-    </p>
-  </section>
+      <p class="notice-received-summary">
+        Calculated from receipt on{" "}
+        <strong id="notice-received-output">—</strong>.
+      </p>
+      <p id="notice-period-explanation"></p>
+      <p class="notice-rule" id="notice-rule-note">
+        This applies the calendar-month rule in section 2G of the{" "}
+        <a
+          href="https://www.legislation.gov.au/Current/C1901A00002"
+          target={linkTarget}
+          rel={linkRel}
+        >
+          Acts Interpretation Act 1901
+        </a>{" "}
+        to the one-to-18-month window in section 42 of the{" "}
+        <a
+          href="https://www.legislation.gov.au/Current/C1961A00012"
+          target={linkTarget}
+          rel={linkRel}
+        >
+          Marriage Act 1961
+        </a>
+        . It assumes no prescribed authority has approved a shorter notice
+        period. A day 31 does not automatically roll over: notice received on
+        31 July ordinarily permits marriage on 31 August, while notice received
+        on 31 August ordinarily permits marriage from 1 October because
+        September has no day 31. Your celebrant must confirm the final dates.
+      </p>
+    </section>
+  );
 }
 
 // === Static assets ===
-app.get('/logo.svg', (c) => {
+app.get("/logo.svg", (c) => {
   return new Response(logoSvg, {
-    headers: { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'public, max-age=31536000, immutable' },
-  })
-})
+    headers: {
+      "Content-Type": "image/svg+xml",
+      "Cache-Control": "public, max-age=31536000, immutable",
+    },
+  });
+});
 
-app.get('/favicon.png', (c) => {
+app.get("/favicon.png", (c) => {
   return new Response(faviconPng, {
-    headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=31536000, immutable' },
-  })
-})
+    headers: {
+      "Content-Type": "image/png",
+      "Cache-Control": "public, max-age=31536000, immutable",
+    },
+  });
+});
 
-app.get('/og-image.png', (c) => {
+app.get("/og-image.png", (c) => {
   return new Response(ogImagePng, {
-    headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=31536000, immutable' },
-  })
-})
+    headers: {
+      "Content-Type": "image/png",
+      "Cache-Control": "public, max-age=31536000, immutable",
+    },
+  });
+});
 
-app.get('/pico.min.css', (c) => {
+app.get("/pico.min.css", (c) => {
   return new Response(picoCss, {
-    headers: { 'Content-Type': 'text/css', 'Cache-Control': 'public, max-age=31536000, immutable' },
-  })
-})
+    headers: {
+      "Content-Type": "text/css",
+      "Cache-Control": "public, max-age=31536000, immutable",
+    },
+  });
+});
 
-app.get('/occupations.txt', () => {
+app.get("/occupations.txt", () => {
   return new Response(occupationsText, {
     headers: {
-      'Content-Type': 'text/plain; charset=utf-8',
-      'Cache-Control': 'public, max-age=86400',
-      'X-Content-Type-Options': 'nosniff',
+      "Content-Type": "text/plain; charset=utf-8",
+      "Cache-Control": "public, max-age=86400",
+      "X-Content-Type-Options": "nosniff",
     },
-  })
-})
+  });
+});
 
 // Standalone calculator intended to be embedded on celebrant websites.
 app.get(NOTICE_PERIOD_EMBED_PATH, (c) => {
-  c.header('Content-Security-Policy', "default-src 'none'; img-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors *")
-  c.header('Referrer-Policy', 'no-referrer')
-  c.header('X-Content-Type-Options', 'nosniff')
-  c.header('X-Robots-Tag', 'noindex, nofollow')
+  c.header(
+    "Content-Security-Policy",
+    "default-src 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors *",
+  );
+  c.header("Referrer-Policy", "no-referrer");
+  c.header("X-Content-Type-Options", "nosniff");
+  c.header("X-Robots-Tag", "noindex, nofollow");
 
   return c.html(
-    '<!DOCTYPE html>' +
-    (<html lang="en">
-      <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>NOIM notice period calculator</title>
-        <meta name="color-scheme" content="light dark" />
-        <link rel="stylesheet" href="/pico.min.css" />
-        <style>{`
+    "<!DOCTYPE html>" +
+      (
+        <html lang="en">
+          <head>
+            <meta charset="utf-8" />
+            <meta
+              name="viewport"
+              content="width=device-width, initial-scale=1"
+            />
+            <title>NOIM notice period calculator</title>
+            <meta name="color-scheme" content="light dark" />
+            <link rel="stylesheet" href="/pico.min.css" />
+            <style>{`
           :root {
             --bg:#fff;
             --text:#111;
@@ -155,50 +237,90 @@ app.get(NOTICE_PERIOD_EMBED_PATH, (c) => {
             .notice-result strong { font-size:0.9rem; }
           }
         `}</style>
-      </head>
-      <body>
-        <header class="embed-header">
-          <a href="https://noimeasy.au/" target="_blank" rel="noopener noreferrer" aria-label="Visit NOIM Easy">
-            <img src="/logo.svg" alt="NOIM Easy" width="187" height="32" />
-          </a>
-        </header>
-        <main>
-          <NoticePeriodCalculator embedded />
-        </main>
-        <script dangerouslySetInnerHTML={{ __html: getNoticePeriodCalculatorScript() }} />
-        <script dangerouslySetInnerHTML={{ __html: getNoticePeriodEmbedResizeScript() }} />
-      </body>
-    </html>).toString()
-  )
-})
+          </head>
+          <body>
+            <header class="embed-header">
+              <a
+                href="https://noimeasy.au/"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Visit NOIM Easy"
+              >
+                <img src="/logo.svg" alt="NOIM Easy" width="187" height="32" />
+              </a>
+            </header>
+            <main>
+              <NoticePeriodCalculator embedded />
+            </main>
+            <script
+              dangerouslySetInnerHTML={{
+                __html: getNoticePeriodCalculatorScript(),
+              }}
+            />
+            <script
+              dangerouslySetInnerHTML={{
+                __html: getNoticePeriodEmbedResizeScript(),
+              }}
+            />
+          </body>
+        </html>
+      ).toString(),
+  );
+});
 
 // === Landing page ===
-app.get('/', (c) => {
-  const [beforeProcessMd, afterProcessMd = ''] = landingMd.split('[[NOTICE_PROCESS]]')
-  const beforeProcessContent = markdownToHtml(beforeProcessMd)
-  const afterProcessContent = markdownToHtml(afterProcessMd)
+app.get("/", (c) => {
+  const [beforeProcessMd, afterProcessMd = ""] =
+    landingMd.split("[[NOTICE_PROCESS]]");
+  const beforeProcessContent = markdownToHtml(beforeProcessMd);
+  const afterProcessContent = markdownToHtml(afterProcessMd);
   return c.html(
-    '<!DOCTYPE html>' +
-    (<html lang="en">
-      <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>NOIM Easy — Prepare your Notice of Intended Marriage</title>
-        <meta name="description" content="NOIM Easy makes it simple to fill out and prepare your Australian Notice of Intended Marriage (NOIM). Complete the form online, download your PDF, and take it to your celebrant." />
-        <meta property="og:title" content="NOIM Easy — Prepare your Notice of Intended Marriage" />
-        <meta property="og:description" content="This app helps you prepare your Notice of Intended Marriage form accurately, privately, and in about 10 minutes." />
-        <meta property="og:image" content="https://noimeasy.au/og-image.png" />
-        <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://noimeasy.au/" />
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="NOIM Easy — Prepare your Notice of Intended Marriage" />
-        <meta name="twitter:description" content="This app helps you prepare your Notice of Intended Marriage form accurately, privately, and in about 10 minutes." />
-        <meta name="twitter:image" content="https://noimeasy.au/og-image.png" />
-        <meta name="color-scheme" content="light dark" />
-        <link rel="icon" type="image/png" href="/favicon.png" />
-        <link rel="preload" href="/pico.min.css" as="style" />
-        <link rel="stylesheet" href="/pico.min.css" />
-        <style>{`
+    "<!DOCTYPE html>" +
+      (
+        <html lang="en">
+          <head>
+            <meta charset="utf-8" />
+            <meta
+              name="viewport"
+              content="width=device-width, initial-scale=1"
+            />
+            <title>NOIM Easy — Prepare your Notice of Intended Marriage</title>
+            <meta
+              name="description"
+              content="NOIM Easy makes it simple to fill out and prepare your Australian Notice of Intended Marriage (NOIM). Complete the form online, download your PDF, and take it to your celebrant."
+            />
+            <meta
+              property="og:title"
+              content="NOIM Easy — Prepare your Notice of Intended Marriage"
+            />
+            <meta
+              property="og:description"
+              content="This app helps you prepare your Notice of Intended Marriage form accurately, privately, and in about 10 minutes."
+            />
+            <meta
+              property="og:image"
+              content="https://noimeasy.au/og-image.png"
+            />
+            <meta property="og:type" content="website" />
+            <meta property="og:url" content="https://noimeasy.au/" />
+            <meta name="twitter:card" content="summary_large_image" />
+            <meta
+              name="twitter:title"
+              content="NOIM Easy — Prepare your Notice of Intended Marriage"
+            />
+            <meta
+              name="twitter:description"
+              content="This app helps you prepare your Notice of Intended Marriage form accurately, privately, and in about 10 minutes."
+            />
+            <meta
+              name="twitter:image"
+              content="https://noimeasy.au/og-image.png"
+            />
+            <meta name="color-scheme" content="light dark" />
+            <link rel="icon" type="image/png" href="/favicon.png" />
+            <link rel="preload" href="/pico.min.css" as="style" />
+            <link rel="stylesheet" href="/pico.min.css" />
+            <style>{`
           :root {
             --bg: #fff;
             --text: #111;
@@ -476,191 +598,314 @@ app.get('/', (c) => {
             #copy-notice-embed { width:100%; }
           }
         `}</style>
-      </head>
-      <body>
-        <div class="site-header">
-          <div class="container">
-            <a href="/" aria-label="NOIM Easy home">
-              <img src="/logo.svg" alt="NOIM Easy" width="187" height="32" />
-            </a>
-            <nav aria-label="Primary navigation">
-              <a class="header-cta" href="/prepare">Prepare a NOIM</a>
-            </nav>
-          </div>
-        </div>
-
-        <main class="container landing">
-          <div dangerouslySetInnerHTML={{ __html: beforeProcessContent }} />
-
-          <section class="process-section" aria-labelledby="after-noim-heading">
-            <h2 id="after-noim-heading">What happens after your PDF is created?</h2>
-            <p class="process-intro">
-              Creating the PDF prepares the form. It does not give legal notice by itself.
-            </p>
-            <ol class="process-steps">
-              <li class="process-step">
-                <span class="process-number" aria-hidden="true">1</span>
-                <div>
-                  <h3>Review the prepared NOIM</h3>
-                  <p>Download the PDF and check every detail against your supporting documents before anyone signs it.</p>
-                </div>
-              </li>
-              <li class="process-step">
-                <span class="process-number" aria-hidden="true">2</span>
-                <div>
-                  <h3>Sign under an authorised witness's observation</h3>
-                  <p>Each party signs in person or by audio-visual link under the current location rules. The witness can be one of the authorised people listed below, including the celebrant who will marry you.</p>
-                </div>
-              </li>
-              <li class="process-step">
-                <span class="process-number" aria-hidden="true">3</span>
-                <div>
-                  <h3>Give the signed NOIM to your celebrant</h3>
-                  <p>Your celebrant can receive the completed and witnessed NOIM physically or as a scanned or emailed copy. They will review it and record the date received.</p>
-                </div>
-              </li>
-              <li class="process-step">
-                <span class="process-number" aria-hidden="true">4</span>
-                <div>
-                  <h3>The legal notice window begins</h3>
-                  <p>The one-month period starts when the celebrant receives the completed and signed NOIM—not when this PDF is generated, a booking is made, or a deposit is paid. The marriage must ordinarily occur within the following 18-month window.</p>
-                </div>
-              </li>
-            </ol>
-          </section>
-
-          <NoticePeriodCalculator />
-
-          <details class="embed-disclosure">
-            <summary>Embed this calculator on your website</summary>
-            <div class="embed-disclosure-content">
-              <p>Copy and paste this code into your website. It includes the calculator and its attribution links.</p>
-              <pre class="embed-code"><code id="notice-embed-code">{NOTICE_PERIOD_EMBED_CODE}</code></pre>
-              <div class="embed-copy-row">
-                <button type="button" id="copy-notice-embed">Copy embed code</button>
-                <span id="notice-embed-status" role="status" aria-live="polite"></span>
+          </head>
+          <body>
+            <div class="site-header">
+              <div class="container">
+                <a href="/" aria-label="NOIM Easy home">
+                  <img
+                    src="/logo.svg"
+                    alt="NOIM Easy"
+                    width="187"
+                    height="32"
+                  />
+                </a>
+                <nav aria-label="Primary navigation">
+                  <a class="header-cta" href="/prepare">
+                    Prepare a NOIM
+                  </a>
+                </nav>
               </div>
             </div>
-          </details>
 
-          <div dangerouslySetInnerHTML={{ __html: afterProcessContent }} />
+            <main class="container landing">
+              <div dangerouslySetInnerHTML={{ __html: beforeProcessContent }} />
 
-          <div class="privacy-notice">
-            <h3>Privacy notice</h3>
-            <p>
-              <strong>We do not store any of your data.</strong> The information you enter is used only to generate your NOIM PDF in your browser session. Nothing is saved to a database, no data is logged, and no personal information is retained on our servers after your PDF is generated.
-            </p>
-            <p>
-              No analytics or tracking are used on this site. Address details stay in the form and are included only when you choose to generate the PDF.
-            </p>
-            <p>
-              If you have any concerns about providing your information online, you do not need to use this service. You are welcome to contact your marriage celebrant directly and complete the NOIM form in person.
-            </p>
-          </div>
+              <section
+                class="process-section"
+                aria-labelledby="after-noim-heading"
+              >
+                <h2 id="after-noim-heading">
+                  What happens after your PDF is created?
+                </h2>
+                <p class="process-intro">
+                  Creating the PDF prepares the form. It does not give legal
+                  notice by itself.
+                </p>
+                <ol class="process-steps">
+                  <li class="process-step">
+                    <span class="process-number" aria-hidden="true">
+                      1
+                    </span>
+                    <div>
+                      <h3>Review the prepared NOIM</h3>
+                      <p>
+                        Download the PDF and check every detail against your
+                        supporting documents before anyone signs it.
+                      </p>
+                    </div>
+                  </li>
+                  <li class="process-step">
+                    <span class="process-number" aria-hidden="true">
+                      2
+                    </span>
+                    <div>
+                      <h3>Sign under an authorised witness's observation</h3>
+                      <p>
+                        Each party signs in person or by audio-visual link under
+                        the current location rules. The witness can be one of
+                        the authorised people listed below, including the
+                        celebrant who will marry you.
+                      </p>
+                    </div>
+                  </li>
+                  <li class="process-step">
+                    <span class="process-number" aria-hidden="true">
+                      3
+                    </span>
+                    <div>
+                      <h3>Give the signed NOIM to your celebrant</h3>
+                      <p>
+                        Your celebrant can receive the completed and witnessed
+                        NOIM physically or as a scanned or emailed copy. They
+                        will review it and record the date received.
+                      </p>
+                    </div>
+                  </li>
+                  <li class="process-step">
+                    <span class="process-number" aria-hidden="true">
+                      4
+                    </span>
+                    <div>
+                      <h3>The legal notice window begins</h3>
+                      <p>
+                        The one-month period starts when the celebrant receives
+                        the completed and signed NOIM—not when this PDF is
+                        generated, a booking is made, or a deposit is paid. The
+                        marriage must ordinarily occur within the following
+                        18-month window.
+                      </p>
+                    </div>
+                  </li>
+                </ol>
+              </section>
 
-          <div class="cta">
-            <a href="/prepare" role="button">Prepare your NOIM now</a>
-          </div>
-        </main>
+              <NoticePeriodCalculator />
 
-        <footer class="site-footer">
-          NOIM Easy is a preparation tool only. It does not constitute legal advice.
-          <div class="credit">Another <a href="https://unpopular.au">Unpopular</a> website on <a href="https://theinternet.com.au">The Internet</a> made by <a href="https://marriedbyjosh.com">Josh</a> for the benefit and use of the entire marriage celebrant community.</div>
-          <div>
-            <a href="https://github.com/joshwithers/noimeasy" class="open-source">
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
-              Open source — view code, verify privacy, or run your own
-            </a>
-          </div>
-        </footer>
-        <script dangerouslySetInnerHTML={{ __html: getNoticePeriodCalculatorScript() }} />
-        <script dangerouslySetInnerHTML={{ __html: getNoticePeriodEmbedCopyScript() }} />
-      </body>
-    </html>).toString()
-  )
-})
+              <details class="embed-disclosure">
+                <summary>Embed this calculator on your website</summary>
+                <div class="embed-disclosure-content">
+                  <p>
+                    For celebrant and venue websites: copy the calculator code
+                    into a page or HTML block. It is an iframe only—no account,
+                    lead form, cookie, pixel or analytics is added to your
+                    website.
+                  </p>
+                  <p>
+                    The calculator helps explain the ordinary timing rule; it
+                    does not prepare, receive or lodge a couple’s NOIM. The
+                    small attribution is optional.
+                  </p>
+                  <pre class="embed-code">
+                    <code id="notice-embed-code">
+                      {NOTICE_PERIOD_EMBED_CODE}
+                      {"\n\n<!-- Optional attribution -->\n"}
+                      {NOTICE_PERIOD_EMBED_ATTRIBUTION}
+                    </code>
+                  </pre>
+                  <div class="embed-copy-row">
+                    <button type="button" id="copy-notice-embed">
+                      Copy embed code
+                    </button>
+                    <span
+                      id="notice-embed-status"
+                      role="status"
+                      aria-live="polite"
+                    ></span>
+                  </div>
+                </div>
+              </details>
+
+              <div dangerouslySetInnerHTML={{ __html: afterProcessContent }} />
+
+              <div class="privacy-notice">
+                <h3>Privacy notice</h3>
+                <p>
+                  <strong>We do not store any of your data.</strong> The
+                  information you enter is used only to generate your NOIM PDF
+                  in your browser session. Nothing is saved to a database, no
+                  data is logged, and no personal information is retained on our
+                  servers after your PDF is generated.
+                </p>
+                <p>
+                  No analytics or tracking are used on this site. Address
+                  details stay in the form and are included only when you choose
+                  to generate the PDF.
+                </p>
+                <p>
+                  If you have any concerns about providing your information
+                  online, you do not need to use this service. You are welcome
+                  to contact your marriage celebrant directly and complete the
+                  NOIM form in person.
+                </p>
+              </div>
+
+              <div class="cta">
+                <a href="/prepare" role="button">
+                  Prepare your NOIM now
+                </a>
+              </div>
+            </main>
+
+            <footer class="site-footer">
+              NOIM Easy is a preparation tool only. It does not constitute legal
+              advice.
+              <div class="credit">
+                Another <a href="https://unpopular.au">Unpopular</a> website on{" "}
+                <a href="https://theinternet.com.au">The Internet</a> made by{" "}
+                <a href="https://marriedbyjosh.com">Josh</a> for the benefit and
+                use of the entire marriage celebrant community.
+              </div>
+              <div>
+                <a
+                  href="https://github.com/joshwithers/noimeasy"
+                  class="open-source"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="14"
+                    height="14"
+                    viewBox="0 0 16 16"
+                    fill="currentColor"
+                  >
+                    <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z" />
+                  </svg>
+                  Open source — view code, verify privacy, or run your own
+                </a>
+              </div>
+            </footer>
+            <script
+              dangerouslySetInnerHTML={{
+                __html: getNoticePeriodCalculatorScript(),
+              }}
+            />
+            <script
+              dangerouslySetInnerHTML={{
+                __html: getNoticePeriodEmbedCopyScript(),
+              }}
+            />
+          </body>
+        </html>
+      ).toString(),
+  );
+});
 
 // === NOIM form ===
-app.get('/prepare', (c) => {
+app.get("/prepare", (c) => {
   return c.html(
-    '<!DOCTYPE html>' +
-    (<NoimFormPage
-      submitUrl="/submit"
-    />).toString()
-  )
-})
+    "<!DOCTYPE html>" + (<NoimFormPage submitUrl="/submit" />).toString(),
+  );
+});
 
 // === Form submission ===
-app.post('/submit', async (c) => {
-  const requestRejection = formRequestRejection(c.req.raw)
+app.post("/submit", async (c) => {
+  const requestRejection = formRequestRejection(c.req.raw);
   if (requestRejection) {
-    return c.json({ ok: false, error: requestRejection.error }, requestRejection.status)
+    return c.json(
+      { ok: false, error: requestRejection.error },
+      requestRejection.status,
+    );
   }
 
-  const rateLimitKey = c.req.header('CF-Connecting-IP')
-    || c.req.header('X-Forwarded-For')?.split(',')[0]?.trim()
-    || 'anonymous'
-  const rateLimit = await c.env.PDF_RATE_LIMITER.limit({ key: `pdf:${rateLimitKey}` })
+  const rateLimitKey =
+    c.req.header("CF-Connecting-IP") ||
+    c.req.header("X-Forwarded-For")?.split(",")[0]?.trim() ||
+    "anonymous";
+  const rateLimit = await c.env.PDF_RATE_LIMITER.limit({
+    key: `pdf:${rateLimitKey}`,
+  });
   if (!rateLimit.success) {
     return c.json(
-      { ok: false, error: 'Too many PDF requests. Please wait a minute and try again.' },
+      {
+        ok: false,
+        error: "Too many PDF requests. Please wait a minute and try again.",
+      },
       429,
-      { 'Retry-After': '60' },
-    )
+      { "Retry-After": "60" },
+    );
   }
 
-  let body: Record<string, unknown>
+  let body: Record<string, unknown>;
   try {
-    body = await parseFormBodyWithLimit(c.req.raw)
+    body = await parseFormBodyWithLimit(c.req.raw);
   } catch (error) {
     if (error instanceof FormBodyTooLargeError) {
-      return c.json({ ok: false, error: 'Form submission is too large.' }, 413)
+      return c.json({ ok: false, error: "Form submission is too large." }, 413);
     }
-    throw error
+    return c.json({ ok: false, error: 'Unable to read the form submission. Please try again.' }, 400);
   }
 
   // Honeypot check
-  if (typeof body['_hp'] === 'string' && body['_hp'].trim()) {
-    return c.json({ ok: false, error: 'Unable to process this submission.' }, 422)
+  if (typeof body["_hp"] === "string" && body["_hp"].trim()) {
+    return c.json(
+      { ok: false, error: "Unable to process this submission." },
+      422,
+    );
   }
 
-  const validation = validateNoimSubmission(body)
+  const validation = validateNoimSubmission(body);
   if (!validation.valid) {
-    const firstError = Object.values(validation.errors)[0] || 'Please check the form and try again.'
-    return c.json({ ok: false, error: firstError, fields: validation.errors }, 400)
+    const firstError =
+      Object.values(validation.errors)[0] ||
+      "Please check the form and try again.";
+    return c.json(
+      { ok: false, error: firstError, fields: validation.errors },
+      400,
+    );
   }
-  const data = validation.data
+  const data = validation.data;
 
   // Generate PDF — this is the only thing we do with the data
-  let pdfBytes: Uint8Array
+  let pdfBytes: Uint8Array;
   try {
-    pdfBytes = await generateNoimPdf(data)
+    pdfBytes = await generateNoimPdf(data);
   } catch (error) {
     if (error instanceof UnsupportedPdfCharacterError) {
-      return c.json({
-        ok: false,
-        error: `The character ${JSON.stringify(error.character)} cannot be rendered safely in the official NOIM PDF. Please use the spelling shown in the Roman-alphabet section of the supporting document, or ask your celebrant for help.`,
-      }, 422)
+      const characterDescription = error.character === "\n" || error.character === "\r"
+        ? "a line break"
+        : `the character ${JSON.stringify(error.character)}`;
+      return c.json(
+        {
+          ok: false,
+          error: `${error.fieldLabel} contains ${characterDescription}, which cannot be rendered safely in the official NOIM PDF. Please use the spelling shown in the Roman-alphabet section of the supporting document, or ask your celebrant for help.`,
+          fields: Object.fromEntries(pdfFieldInputNames(error.fieldName).map((name) => [name, error.message])),
+        },
+        422,
+      );
     }
     if (error instanceof PdfFieldOverflowError) {
-      return c.json({
-        ok: false,
-        error: `${error.fieldLabel} is too long to fit legibly in the official NOIM PDF. Check the particulars against the supporting documents and ask an authorised celebrant for help rather than letting the legal form clip them.`,
-      }, 422)
+      return c.json(
+        {
+          ok: false,
+          error: `${error.fieldLabel} is too long to fit legibly in the official NOIM PDF. Edit the affected details and check for duplicated text. Keep every necessary detail; if it still does not fit, ask your celebrant for help with the official form.`,
+          fields: Object.fromEntries(pdfFieldInputNames(error.fieldName).map((name) => [name, error.message])),
+        },
+        422,
+      );
     }
-    throw error
+    throw error;
   }
-  const pdfFilename = safePdfFilename(data)
+  const pdfFilename = safePdfFilename(data);
 
   // Return the PDF directly — nothing is stored
   return new Response(pdfBytes, {
     headers: {
-      'Content-Type': 'application/pdf',
-      'Content-Disposition': `attachment; filename="${pdfFilename}"`,
-      'Cache-Control': 'no-store',
-      'X-Content-Type-Options': 'nosniff',
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `attachment; filename="${pdfFilename}"`,
+      "Cache-Control": "no-store",
+      "X-Content-Type-Options": "nosniff",
     },
-  })
-})
+  });
+});
 
-export default app
+export default app;
